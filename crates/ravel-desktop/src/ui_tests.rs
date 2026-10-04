@@ -55,7 +55,7 @@ fn color_at(buffer: &sourceview5::Buffer, needle: &str) -> gtk::gdk::RGBA {
 
 #[test]
 #[ignore = "Requires a display; run with xvfb-run -a dbus-run-session -- cargo test -p ravel-desktop -- --ignored"]
-fn opens_documents_searches_filters_and_displays_selected_json() {
+fn opens_documents_full_width_and_displays_statistics() {
     adw::init().unwrap();
     let app = adw::Application::builder()
         .application_id("io.github.ravel.Ravel.Tests")
@@ -67,14 +67,9 @@ fn opens_documents_searches_filters_and_displays_selected_json() {
         crate::window::create(&app, Some(gio::File::for_path(samples.join("sample.json"))));
     let widget = window.clone().upcast::<gtk::Widget>();
     let text = find::<sourceview5::View>(&widget, None).unwrap();
-    let search = find::<gtk::SearchEntry>(&widget, None).unwrap();
-    let kind = find::<gtk::DropDown>(&widget, None).unwrap();
-    let list = find::<gtk::ListView>(&widget, Some("structure-tree")).unwrap();
-    let selection = list
-        .model()
-        .unwrap()
-        .downcast::<gtk::SingleSelection>()
-        .unwrap();
+    assert!(find::<gtk::Paned>(&widget, None).is_none());
+    assert!(find::<gtk::ListView>(&widget, Some("structure-tree")).is_none());
+    let status = find::<gtk::Label>(&widget, Some("document-statistics")).unwrap();
     wait_for(|| {
         window
             .title()
@@ -107,26 +102,10 @@ fn opens_documents_searches_filters_and_displays_selected_json() {
         light_string_color
     );
 
-    search.set_text("alice");
-    wait_for(|| selection.n_items() == 5); // Description also contains Alice.
-    selection.set_selected(4);
-    assert_eq!(
-        buffer.text(&buffer.start_iter(), &buffer.end_iter(), false),
-        "\"Alice\""
-    );
-    color_at(&buffer, "Alice");
-
-    kind.set_selected(4); // Numbers cannot match Alice.
-    wait_for(|| selection.n_items() == 0);
-    assert!(
-        buffer
-            .text(&buffer.start_iter(), &buffer.end_iter(), false)
-            .is_empty()
-    );
-    search.set_text("");
-    wait_for(|| selection.n_items() > 0);
-    kind.set_selected(0);
-    wait_for(|| selection.n_items() == 6); // Root plus five top-level fields.
+    assert!(status.text().contains("values"));
+    assert!(status.text().contains("objects"));
+    assert!(status.text().contains("Depth"));
+    assert!(status.text().contains("Read only"));
 
     let events = crate::window::create(
         &app,
@@ -138,8 +117,8 @@ fn opens_documents_searches_filters_and_displays_selected_json() {
             .is_some_and(|title| title.contains("events.jsonl"))
     });
     let events_widget = events.clone().upcast::<gtk::Widget>();
-    let events_list = find::<gtk::ListView>(&events_widget, Some("structure-tree")).unwrap();
-    assert_eq!(events_list.model().unwrap().n_items(), 4);
+    let events_status = find::<gtk::Label>(&events_widget, Some("document-statistics")).unwrap();
+    assert!(events_status.text().starts_with("JSON Lines · 3 records"));
     let events_view = find::<sourceview5::View>(&events_widget, None).unwrap();
     let events_buffer = events_view
         .buffer()

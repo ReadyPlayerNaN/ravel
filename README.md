@@ -6,16 +6,16 @@ The initial version focuses on JSON and JSON Lines.
 ## Initial interface
 
 - Open `.json` and `.jsonl` documents from the native chooser or command line.
-- Expand nested objects and arrays in a structural tree.
-- Search keys, JSON Pointer paths, and complete scalar values (case-insensitive).
-- Combine search with a value-type filter: object, array, string, number,
-  boolean, or null. Ancestors remain visible to provide context.
+- Explore nested objects and arrays in a full-width document view, without a
+  separate navigation sidebar. The former sidebar search/type controls are removed.
+- Read document statistics in the footer: value and type counts, object keys,
+  maximum depth, and JSON Lines record count.
 - Switch between **Structured** (native GTK nodes with animated, lazy expansion)
   and **Raw** (the existing JSON text preview). Structured is the default.
 - Right-click any structured node to copy its JSON or JSON Pointer, or run common
   type-specific **jq** operations. Results open in a read-only, copyable dialog;
   the original document is never changed.
-- Read syntax-highlighted JSON in Raw for the selected value and copy it to the clipboard.
+- Read syntax-highlighted JSON in Raw for the document and copy it to the clipboard.
   GtkSourceView colors keys, strings, escapes, numbers, booleans, and null, with
   an Adwaita color scheme that follows the application's light/dark theme.
 - Hover a key in the JSON preview to highlight same-name keys in the visible
@@ -26,9 +26,11 @@ The initial version focuses on JSON and JSON Lines.
 - Get syntax errors with source locations; a failed open leaves the previous
   document intact. File loading is asynchronous and parsing runs off the UI thread.
 
-Object member order and arbitrary-precision numbers are retained. Search prunes
-unrelated descendants, even if a container itself matches. This is structural
-search, not JSONPath, regex search, or a text editor.
+Object member order and arbitrary-precision numbers are retained. Statistics
+include the root and JSON Lines' synthetic array; depth counts edges from the root
+(a scalar or empty container has depth zero). Keys count object members, while
+strings count string values only. Counts are independent of collapsed nodes.
+This is not a text editor.
 
 ## Requirements
 
@@ -64,7 +66,6 @@ chooser replaces its current document only after a successful parse.
 | Shortcut | Action |
 | --- | --- |
 | Ctrl+O | Open document |
-| Ctrl+F | Focus structural search |
 | Ctrl+W | Close window |
 | Ctrl+Q | Quit |
 
@@ -88,7 +89,7 @@ object member names remain literal. Names match exactly, including case.
 
 Pressing or releasing either Shift key updates the highlight without requiring
 mouse movement. Scrolling updates the visible matches under the pointer. Leaving
-a key or changing the selected value clears the highlight. The interaction is
+a key or opening another document clears the highlight. The interaction is
 local to each JSON preview; it does not modify text or highlight the tree sidebar.
 
 ## Code folding (Raw)
@@ -99,8 +100,7 @@ original indentation. Empty inline containers and scalars have nothing to fold.
 
 Nested blocks fold independently. Expanding a parent preserves any previously
 collapsed children. Folds reset when the preview content is replaced, such as
-when selecting another value or opening a document. This does not change the
-sidebar tree's expansion state.
+when opening a document.
 
 Folding only hides text: the document is unchanged. The Copy JSON button and
 selection copying (Ctrl+C) include folded content. Hover matching excludes keys
@@ -145,8 +145,8 @@ explained in `AGENTS.md`.
 
 ## Current scope
 
-Documents and their structural index are held in memory. Filtering and
-pretty-printing selections currently run on the UI thread; this first version
+Documents and their structural index are held in memory. Pretty-printing
+currently runs on the UI thread; this first version
 is for small to medium documents, not multi-gigabyte log streaming. Original
 whitespace is not retained. Editing, JSONPath, pagination, packaging and other
 text formats are not implemented yet.

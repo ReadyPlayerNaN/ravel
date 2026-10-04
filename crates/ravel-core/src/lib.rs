@@ -164,6 +164,30 @@ impl Node {
     }
 }
 
+/// Whole-document counts, including the root (and JSON Lines' synthetic array).
+/// Depth is the maximum number of edges from the root; a scalar root has depth 0.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct Statistics {
+    /// Total JSON values, including containers.
+    pub values: usize,
+    /// Object containers.
+    pub objects: usize,
+    /// Array containers.
+    pub arrays: usize,
+    /// Object members, counting repeated names in different objects separately.
+    pub keys: usize,
+    /// String values (not object keys).
+    pub strings: usize,
+    /// Numeric values.
+    pub numbers: usize,
+    /// Boolean values.
+    pub booleans: usize,
+    /// Null values.
+    pub nulls: usize,
+    /// Maximum depth below the root.
+    pub max_depth: usize,
+}
+
 /// A parsed, read-only document and its structural index.
 #[derive(Debug)]
 pub struct Document {
@@ -211,6 +235,29 @@ impl Document {
     /// Returns the unfiltered tree's root.
     pub fn root(&self) -> Arc<Node> {
         Arc::clone(&self.root)
+    }
+
+    /// Counts all values in the unfiltered document, independent of UI state.
+    pub fn statistics(&self) -> Statistics {
+        let mut stats = Statistics::default();
+        let mut pending = vec![(&*self.root, 0)];
+        while let Some((node, depth)) = pending.pop() {
+            stats.values += 1;
+            stats.max_depth = stats.max_depth.max(depth);
+            match node.kind {
+                Kind::Object => {
+                    stats.objects += 1;
+                    stats.keys += node.children.len();
+                }
+                Kind::Array => stats.arrays += 1,
+                Kind::String => stats.strings += 1,
+                Kind::Number => stats.numbers += 1,
+                Kind::Boolean => stats.booleans += 1,
+                Kind::Null => stats.nulls += 1,
+            }
+            pending.extend(node.children.iter().map(|child| (&**child, depth + 1)));
+        }
+        stats
     }
 
     /// Returns the document's input format.

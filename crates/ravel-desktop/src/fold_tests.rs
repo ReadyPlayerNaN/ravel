@@ -102,18 +102,12 @@ pub fn run(app: &adw::Application) {
     }
     assert_eq!(buffer.tag_table().size(), tag_count);
     toggle(&view, &renderer, 0);
-    let list = find::<gtk::ListView>(&widget, Some("structure-tree")).unwrap();
-    let selection = list
-        .model()
-        .unwrap()
-        .downcast::<gtk::SingleSelection>()
-        .unwrap();
-    selection.set_selected(1); // The users array replaces the folded root.
+    buffer.set_text("[\n  {\"name\": \"Alice\"}\n]"); // Replacing content resets folds.
     assert!(text(&buffer, false).contains("Alice"));
     assert_eq!(text(&buffer, false), text(&buffer, true));
     toggle(&view, &renderer, 0);
     assert_eq!(text(&buffer, false), "[\n]");
-    selection.set_selected(3); // A string scalar has no fold control.
+    buffer.set_text("\"name\""); // A string scalar has no fold control.
     assert_eq!(text(&buffer, false), "\"name\"");
     let start = buffer.start_iter();
     assert!(!renderer.query_activatable(&start, &view.iter_location(&start)));

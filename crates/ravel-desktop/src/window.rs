@@ -7,25 +7,12 @@ use std::{
 use gtk::{gio, glib};
 use libadwaita::{self as adw, prelude::*};
 
-use ravel_core::{Document, Format, Kind, Node};
-
-const KINDS: [Kind; 6] = [
-    Kind::Object,
-    Kind::Array,
-    Kind::String,
-    Kind::Number,
-    Kind::Boolean,
-    Kind::Null,
-];
+use ravel_core::{Document, Format};
 
 struct Viewer {
     window: glib::WeakRef<adw::ApplicationWindow>,
     title: adw::WindowTitle,
     stack: gtk::Stack,
-    tree_stack: gtk::Stack,
-    search: gtk::SearchEntry,
-    kind: gtk::DropDown,
-    selection: gtk::SingleSelection,
     text: sourceview5::View,
     hover: Rc<crate::key_hover::KeyHover>,
     structured: Rc<crate::structured::Structured>,
@@ -62,7 +49,7 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
     let empty = adw::StatusPage::builder()
         .icon_name("text-x-generic-symbolic")
         .title("Untangle your JSON")
-        .description("Open a .json or .jsonl file to browse, search and filter its structure.")
+        .description("Open a .json or .jsonl file to explore its structure.")
         .build();
     let empty_open = gtk::Button::builder()
         .label("Open Document…")
@@ -74,51 +61,6 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
     stack.add_named(&empty, Some("empty"));
 
     let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    let controls = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-    controls.set_margin_top(12);
-    controls.set_margin_bottom(12);
-    controls.set_margin_start(12);
-    controls.set_margin_end(12);
-    let search = gtk::SearchEntry::builder()
-        .placeholder_text("Search keys, paths and values…")
-        .hexpand(true)
-        .tooltip_text("Case-insensitive substring search (Ctrl+F)")
-        .build();
-    let kind = gtk::DropDown::from_strings(&[
-        "All types",
-        "Objects",
-        "Arrays",
-        "Strings",
-        "Numbers",
-        "Booleans",
-        "Null",
-    ]);
-    kind.set_tooltip_text(Some(
-        "Filter matching values by JSON type; ancestors remain visible",
-    ));
-    controls.append(&search);
-    controls.append(&kind);
-    content.append(&controls);
-    content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
-
-    let selection = gtk::SingleSelection::new(None::<gio::ListModel>);
-    let list = gtk::ListView::new(Some(selection.clone()), Some(tree_factory()));
-    list.set_css_classes(&["navigation-sidebar"]);
-    list.set_widget_name("structure-tree");
-    let tree_scroll = gtk::ScrolledWindow::builder()
-        .child(&list)
-        .hscrollbar_policy(gtk::PolicyType::Never)
-        .build();
-    let tree_stack = gtk::Stack::new();
-    tree_stack.add_named(&tree_scroll, Some("tree"));
-    let no_matches = adw::StatusPage::builder()
-        .icon_name("edit-find-symbolic")
-        .title("No matching values")
-        .description("Try another search or choose All types.")
-        .build();
-    tree_stack.add_named(&no_matches, Some("no-matches"));
-    tree_stack.set_size_request(300, -1);
-
     let detail = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let detail_header = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     detail_header.set_margin_top(8);
@@ -170,16 +112,8 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
     detail.append(&detail_header);
     detail.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
     detail.append(&view_stack);
-    let paned = gtk::Paned::builder()
-        .orientation(gtk::Orientation::Horizontal)
-        .position(420)
-        .start_child(&tree_stack)
-        .end_child(&detail)
-        .vexpand(true)
-        .shrink_start_child(false)
-        .shrink_end_child(false)
-        .build();
-    content.append(&paned);
+    detail.set_vexpand(true);
+    content.append(&detail);
     let status = gtk::Label::builder()
         .xalign(0.0)
         .margin_start(12)
@@ -188,6 +122,8 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
         .margin_bottom(6)
         .css_classes(["dim-label"])
         .build();
+    status.set_widget_name("document-statistics");
+    status.set_wrap(true);
     content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
     content.append(&status);
     stack.add_named(&content, Some("document"));
@@ -201,10 +137,6 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
         window: window.downgrade(),
         title,
         stack,
-        tree_stack,
-        search,
-        kind,
-        selection,
         text,
         hover,
         structured,
@@ -262,30 +194,6 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
         }
     ));
     window.add_action(&node_jq);
-    let search_action = gio::SimpleAction::new("search", None);
-    search_action.connect_activate(glib::clone!(
-        #[weak]
-        viewer,
-        move |_, _| {
-            viewer.search.grab_focus();
-        }
-    ));
-    window.add_action(&search_action);
-    viewer.search.connect_search_changed(glib::clone!(
-        #[weak]
-        viewer,
-        move |_| viewer.rebuild_tree()
-    ));
-    viewer.kind.connect_selected_notify(glib::clone!(
-        #[weak]
-        viewer,
-        move |_| viewer.rebuild_tree()
-    ));
-    viewer.selection.connect_selected_item_notify(glib::clone!(
-        #[weak]
-        viewer,
-        move |_| viewer.show_selection()
-    ));
     copy.connect_clicked(glib::clone!(
         #[weak]
         viewer,
@@ -384,10 +292,9 @@ impl Viewer {
                         if let Some(window) = viewer.window.upgrade() {
                             window.set_title(Some(&format!("{name} — Ravel")));
                         }
-                        viewer.search.set_text("");
-                        viewer.kind.set_selected(0);
+
                         viewer.stack.set_visible_child_name("document");
-                        viewer.rebuild_tree();
+                        viewer.show_document();
                     }
                     Err(message) => viewer.show_error(&message),
                 }
@@ -395,93 +302,34 @@ impl Viewer {
         ));
     }
 
-    fn rebuild_tree(&self) {
+    fn show_document(&self) {
         let document = self.document.borrow();
         let Some(document) = document.as_ref() else {
             return;
         };
-        let query = self.search.text();
-        let kind = self
-            .kind
-            .selected()
-            .checked_sub(1)
-            .and_then(|index| KINDS.get(index as usize))
-            .copied();
-        let root = document.filter(&query, kind);
-        let has_matches = root.is_some();
-        let roots = node_store(root);
-        let model = gtk::TreeListModel::new(
-            roots,
-            false,
-            !query.trim().is_empty() || kind.is_some(),
-            |object| {
-                let object = object.downcast_ref::<glib::BoxedAnyObject>()?;
-                let node = object.borrow::<Arc<Node>>();
-                if node.children.is_empty() {
-                    None
-                } else {
-                    Some(node_store(node.children.iter().cloned()).upcast())
-                }
-            },
-        );
-        self.selection.set_model(Some(&model));
-        if let Some(row) = model.row(0) {
-            row.set_expanded(true);
-        }
-        self.tree_stack
-            .set_visible_child_name(if has_matches { "tree" } else { "no-matches" });
-        let root = document.root();
-        let summary = if document.format() == Format::JsonLines {
-            format!("JSON Lines · {} records", root.children.len())
-        } else {
-            "JSON".into()
-        };
-        self.status.set_text(&format!(
-            "{summary} · Read only{}",
-            if has_matches {
-                ""
-            } else {
-                " · No matching values"
-            }
-        ));
-    }
-
-    fn show_selection(&self) {
-        let Some(row) = self
-            .selection
-            .selected_item()
-            .and_downcast::<gtk::TreeListRow>()
-        else {
-            self.text.buffer().set_text("");
-            self.pointer.set_text("No selection");
-            return;
-        };
-        let Some(object) = row.item().and_downcast::<glib::BoxedAnyObject>() else {
-            return;
-        };
-        let node = object.borrow::<Arc<Node>>();
-        let document = self.document.borrow();
-        let Some(document) = document.as_ref() else {
-            return;
-        };
-        let (Some(root), Some(value)) = (document.value_at(""), document.value_at(&node.pointer))
-        else {
+        let Some(value) = document.value_at("") else {
             return;
         };
         match serde_json::to_string_pretty(value) {
-            Ok(text) => self.hover.set_content(root, &node.pointer, &text),
+            Ok(text) => self.hover.set_content(value, "", &text),
             Err(error) => {
                 self.show_error(&error.to_string());
                 return;
             }
         }
-        self.structured.set_content(document, &node.pointer);
-        self.pointer.set_text(if node.pointer.is_empty() {
-            "$ (document root)"
+        self.structured.set_content(document, "");
+        self.pointer.set_text("$ (document root)");
+        let stats = document.statistics();
+        let format = if document.format() == Format::JsonLines {
+            format!("JSON Lines · {} records", document.root().children.len())
         } else {
-            &node.pointer
-        });
-        self.pointer.set_tooltip_text(Some(&node.pointer));
+            "JSON".to_owned()
+        };
+        self.status.set_text(&format!(
+            "{format} · {} values · {} objects · {} arrays · {} keys · {} strings · {} numbers · {} booleans · {} nulls · Depth {} · Read only",
+            stats.values, stats.objects, stats.arrays, stats.keys, stats.strings,
+            stats.numbers, stats.booleans, stats.nulls, stats.max_depth,
+        ));
     }
 
     /// Copies a node's JSON or its JSON Pointer to the clipboard.
@@ -541,76 +389,4 @@ impl Viewer {
             dialog.present(Some(&window));
         }
     }
-}
-
-fn node_store(nodes: impl IntoIterator<Item = Arc<Node>>) -> gio::ListStore {
-    let store = gio::ListStore::new::<glib::BoxedAnyObject>();
-    for node in nodes {
-        store.append(&glib::BoxedAnyObject::new(node));
-    }
-    store
-}
-
-fn tree_factory() -> gtk::SignalListItemFactory {
-    let factory = gtk::SignalListItemFactory::new();
-    factory.connect_setup(|_, object| {
-        let Some(item) = object.downcast_ref::<gtk::ListItem>() else {
-            return;
-        };
-        let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-        row.set_margin_top(6);
-        row.set_margin_bottom(6);
-        let key = gtk::Label::builder()
-            .xalign(0.0)
-            .ellipsize(gtk::pango::EllipsizeMode::End)
-            .width_chars(12)
-            .build();
-        let value = gtk::Label::builder()
-            .xalign(0.0)
-            .hexpand(true)
-            .ellipsize(gtk::pango::EllipsizeMode::End)
-            .css_classes(["dim-label"])
-            .build();
-        row.append(&key);
-        row.append(&value);
-        let expander = gtk::TreeExpander::new();
-        expander.set_child(Some(&row));
-        item.set_child(Some(&expander));
-    });
-    factory.connect_bind(|_, object| {
-        let Some(item) = object.downcast_ref::<gtk::ListItem>() else {
-            return;
-        };
-        let Some(expander) = item.child().and_downcast::<gtk::TreeExpander>() else {
-            return;
-        };
-        let Some(row) = item.item().and_downcast::<gtk::TreeListRow>() else {
-            return;
-        };
-        let Some(object) = row.item().and_downcast::<glib::BoxedAnyObject>() else {
-            return;
-        };
-        let node = object.borrow::<Arc<Node>>();
-        expander.set_list_row(Some(&row));
-        expander.set_tooltip_text(Some(&format!("{} · {:?}", node.pointer, node.kind)));
-        let Some(labels) = expander.child() else {
-            return;
-        };
-        if let Some(key) = labels.first_child().and_downcast::<gtk::Label>() {
-            key.set_text(&node.label);
-        }
-        if let Some(value) = labels.last_child().and_downcast::<gtk::Label>() {
-            value.set_text(&node.preview);
-        }
-    });
-    factory.connect_unbind(|_, object| {
-        if let Some(expander) = object
-            .downcast_ref::<gtk::ListItem>()
-            .and_then(|item| item.child())
-            .and_downcast::<gtk::TreeExpander>()
-        {
-            expander.set_list_row(None::<&gtk::TreeListRow>);
-        }
-    });
-    factory
 }

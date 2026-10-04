@@ -45,7 +45,6 @@ fn main() -> glib::ExitCode {
     ));
     app.add_action(&quit);
     app.set_accels_for_action("win.open", &["<Control>o"]);
-    app.set_accels_for_action("win.search", &["<Control>f"]);
     app.set_accels_for_action("window.close", &["<Control>w"]);
     app.set_accels_for_action("app.quit", &["<Control>q"]);
     app.run()
