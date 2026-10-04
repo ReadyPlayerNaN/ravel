@@ -150,7 +150,10 @@ pub fn attach_menu(widget: &impl IsA<gtk::Widget>, kind: Kind, pointer: &str) {
         popover.set_parent(&menu_widget);
         popover.popup();
         popover.connect_closed(move |popover| {
-            popover.unparent();
+            // Menu items dispatch their action after closing. Keep the widget
+            // ancestry intact until that dispatch can resolve the win actions.
+            let popover = popover.clone();
+            glib::idle_add_local_once(move || popover.unparent());
         });
     });
     widget.add_controller(gesture);

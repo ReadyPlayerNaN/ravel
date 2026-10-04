@@ -77,6 +77,16 @@ row) for a custom node menu. Object operations include keys, values, length and
 entries; arrays offer sorting, uniqueness, reversal, flattening and aggregation;
 strings offer case conversion and numeric conversion. Every type offers `type`.
 Each filter runs against that node alone, using jq stdin rather than a shell.
+The result appears in a separate **jq: Operation** dialog with a Copy button;
+these actions do not edit, reorder or replace the document. For example, **Length**
+counts array items, object members or string characters; **Keys** returns object
+key names; **Values** returns an array of member values; **To Entries** returns
+`{key, value}` pairs. **Sort**, **Unique**, **Reverse** and **Flatten** return
+transformed arrays; **Add** sums numbers or combines compatible values; **First**,
+**Last**, **Min** and **Max** select values. **Join** combines array values with
+`, `; case conversion is ASCII-only; **Type** returns a type name such as `"object"`.
+Structured keys and scalar values use the same JSON syntax colors and light/dark
+schemes as Raw, including highlighting of string escapes.
 Some operations are invalid for particular values (for example `tonumber` on
 non-numeric text); jq's error is shown without changing the document.
 

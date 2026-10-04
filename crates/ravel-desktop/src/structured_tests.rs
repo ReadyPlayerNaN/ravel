@@ -96,6 +96,46 @@ pub fn run(app: &adw::Application) {
     events_root.emit_clicked();
     wait_for(|| toggles(&events_structured).len() == 4); // Root plus three records.
     events.close();
+    // Exercise the real menu activation path, not just the window action.
+    let controllers = root.observe_controllers();
+    let gesture = (0..controllers.n_items())
+        .filter_map(|index| controllers.item(index))
+        .find_map(|object| {
+            object
+                .downcast::<gtk::GestureClick>()
+                .ok()
+                .filter(|click| click.button() == gtk::gdk::BUTTON_SECONDARY)
+        })
+        .unwrap();
+    gesture.emit_by_name::<()>("pressed", &[&1_i32, &0_f64, &0_f64]);
+    let popover = find::<gtk::PopoverMenu>(&root.clone().upcast(), None).unwrap();
+    fn activate_type(widget: &gtk::Widget) -> bool {
+        if widget.type_().name() == "GtkModelButton"
+            && find::<gtk::Label>(widget, None).is_some_and(|label| label.text() == "Type")
+        {
+            widget.emit_by_name::<()>("clicked", &[]);
+            return true;
+        }
+        let mut child = widget.first_child();
+        while let Some(widget) = child {
+            if activate_type(&widget) {
+                return true;
+            }
+            child = widget.next_sibling();
+        }
+        false
+    }
+    assert!(activate_type(&popover.upcast()));
+    wait_for(|| window.visible_dialog().is_some());
+    let menu_result = window.visible_dialog().unwrap();
+    assert_eq!(menu_result.title(), "jq: Type");
+    let menu_view = find::<sourceview5::View>(&menu_result.clone().upcast(), None).unwrap();
+    let menu_buffer = menu_view.buffer();
+    assert_eq!(
+        menu_buffer.text(&menu_buffer.start_iter(), &menu_buffer.end_iter(), true),
+        "\"object\""
+    );
+    menu_result.close();
     gtk::prelude::WidgetExt::activate_action(
         &window,
         "win.node-jq",
