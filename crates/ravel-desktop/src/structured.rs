@@ -176,11 +176,11 @@ fn scalar_widget(document: &Arc<Document>, pointer: &str, label: &str, depth: i3
         .label(&preview)
         .xalign(0.0)
         .hexpand(true)
-        .css_classes(["dim-label"])
         .ellipsize(pango::EllipsizeMode::End)
         .tooltip_text(&preview)
         .selectable(true)
         .build();
+    crate::syntax_label::apply(&value, &preview, 0, preview.len());
     row.append(&key);
     row.append(&value);
     row.upcast()
@@ -191,13 +191,15 @@ fn revealer_toggle(revealer: &gtk::Revealer) {
 }
 
 fn key_label(label: &str) -> gtk::Label {
-    gtk::Label::builder()
+    let widget = gtk::Label::builder()
         .label(format!("<b>{}</b>", glib::markup_escape_text(label)))
         .use_markup(true)
         .xalign(0.0)
         .width_chars(6)
         .ellipsize(pango::EllipsizeMode::End)
-        .build()
+        .build();
+    crate::syntax_label::apply_key(&widget);
+    widget
 }
 
 fn member_pointers(document: &Arc<Document>, pointer: &str) -> Vec<(String, String)> {
@@ -228,7 +230,6 @@ fn single_line(value: &Value) -> String {
     match value {
         Value::Object(members) => format!("{{}} · {} members", members.len()),
         Value::Array(items) => format!("[] · {} items", items.len()),
-        Value::String(text) => text.clone(),
         other => other.to_string(),
     }
 }

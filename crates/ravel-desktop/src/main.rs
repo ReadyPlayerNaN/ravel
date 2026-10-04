@@ -5,6 +5,7 @@ mod key_hover;
 mod key_index;
 mod preview;
 mod structured;
+mod syntax_label;
 mod window;
 
 #[cfg(test)]

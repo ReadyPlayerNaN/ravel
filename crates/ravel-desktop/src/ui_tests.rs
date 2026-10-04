@@ -95,7 +95,18 @@ fn opens_documents_full_width_and_displays_statistics() {
     color_at(&buffer, "true");
     color_at(&buffer, "false");
     color_at(&buffer, "null");
+    let syntax_label = gtk::Label::new(Some("\"é \\u0041\""));
+    crate::syntax_label::apply(&syntax_label, "\"é \\u0041\"", 0, "\"é \\u0041\"".len());
+    let light_attributes = syntax_label.attributes().unwrap().to_string();
+    assert!(!light_attributes.is_empty());
+    let key_label = gtk::Label::new(Some("é key"));
+    crate::syntax_label::apply_key(&key_label);
+    assert!(!key_label.attributes().unwrap().to_string().is_empty());
     styles.set_color_scheme(adw::ColorScheme::ForceDark);
+    assert_ne!(
+        syntax_label.attributes().unwrap().to_string(),
+        light_attributes
+    );
     assert_eq!(buffer.style_scheme().unwrap().id(), "Adwaita-dark");
     assert_ne!(
         color_at(&buffer, "Ravel sample document"),
