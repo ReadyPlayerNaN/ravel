@@ -35,6 +35,8 @@ pub fn run(app: &adw::Application) {
     });
     let widget = window.clone().upcast::<gtk::Widget>();
     let view = find::<sourceview5::View>(&widget, None).unwrap();
+    let view_stack = find::<adw::ViewStack>(&widget, Some("view-stack")).unwrap();
+    view_stack.set_property("visible-child-name", "raw");
     let renderer = find::<sourceview5::GutterRendererText>(&widget, Some("code-folds")).unwrap();
     let buffer = view.buffer();
     let original = text(&buffer, true);

@@ -50,7 +50,8 @@ pub enum Kind {
 }
 
 impl Kind {
-    fn of(value: &Value) -> Self {
+    /// Classifies a JSON value into its [`Kind`].
+    pub fn of(value: &Value) -> Self {
         match value {
             Value::Object(_) => Self::Object,
             Value::Array(_) => Self::Array,

@@ -176,4 +176,5 @@ fn opens_documents_searches_filters_and_displays_selected_json() {
     events.close();
     crate::hover_tests::run(&app);
     crate::fold_tests::run(&app);
+    crate::structured_tests::run(&app);
 }

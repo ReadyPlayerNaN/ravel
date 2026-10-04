@@ -3,12 +3,15 @@ mod folding;
 mod key_hover;
 mod key_index;
 mod preview;
+mod structured;
 mod window;
 
 #[cfg(test)]
 mod fold_tests;
 #[cfg(test)]
 mod hover_tests;
+#[cfg(test)]
+mod structured_tests;
 #[cfg(test)]
 mod ui_tests;
 

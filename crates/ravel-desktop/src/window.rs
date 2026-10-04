@@ -28,6 +28,7 @@ struct Viewer {
     selection: gtk::SingleSelection,
     text: sourceview5::View,
     hover: Rc<crate::key_hover::KeyHover>,
+    structured: Rc<crate::structured::Structured>,
     _folding: Rc<crate::folding::Folding>,
     pointer: gtk::Label,
     status: gtk::Label,
@@ -137,17 +138,38 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
         .css_classes(["flat"])
         .build();
     copy.set_widget_name("copy-json");
-    detail_header.append(&pointer);
-    detail_header.append(&copy);
-    detail.append(&detail_header);
-    detail.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+    let (structured_widget, structured) = crate::structured::create();
     let text = crate::preview::create();
     let detail_scroll = gtk::ScrolledWindow::builder()
         .child(&text)
         .vexpand(true)
         .hexpand(true)
         .build();
-    detail.append(&detail_scroll);
+    let view_stack = adw::ViewStack::new();
+    view_stack.set_widget_name("view-stack");
+    view_stack.add_titled_with_icon(
+        &structured_widget,
+        Some("structured"),
+        "Structured",
+        "view-list-symbolic",
+    );
+    view_stack.add_titled_with_icon(
+        &detail_scroll,
+        Some("raw"),
+        "Raw",
+        "text-x-generic-symbolic",
+    );
+    view_stack.set_property("visible-child-name", "structured");
+    let switcher = adw::ViewSwitcher::builder()
+        .stack(&view_stack)
+        .policy(adw::ViewSwitcherPolicy::Wide)
+        .build();
+    detail_header.append(&switcher);
+    detail_header.append(&pointer);
+    detail_header.append(&copy);
+    detail.append(&detail_header);
+    detail.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+    detail.append(&view_stack);
     let paned = gtk::Paned::builder()
         .orientation(gtk::Orientation::Horizontal)
         .position(420)
@@ -185,6 +207,7 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
         selection,
         text,
         hover,
+        structured,
         _folding: folding,
         pointer,
         status,
@@ -412,6 +435,7 @@ impl Viewer {
                 return;
             }
         }
+        self.structured.set_content(document, &node.pointer);
         self.pointer.set_text(if node.pointer.is_empty() {
             "$ (document root)"
         } else {
