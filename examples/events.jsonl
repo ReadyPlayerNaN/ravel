@@ -1,0 +1,3 @@
+{"level":"info","message":"Document opened","document":"sample.json"}
+{"level":"warning","message":"No matching values","query":"missing"}
+{"level":"info","message":"Search completed","matches":2}

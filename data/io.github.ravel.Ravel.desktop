@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Ravel
+Comment=Browse, search and filter JSON documents
+Exec=ravel %F
+Icon=text-x-generic
+Terminal=false
+Categories=GTK;Office;Viewer;
+MimeType=application/json;application/x-ndjson;
+StartupNotify=true

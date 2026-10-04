@@ -1,0 +1,10 @@
+{
+  "title": "Ravel sample document",
+  "description": "Browse the structure, search for Alice, or filter by Numbers.",
+  "users": [
+    { "name": "Alice", "age": 32, "active": true, "tags": ["admin", "reader"] },
+    { "name": "Bob", "age": 27, "active": false, "tags": [] }
+  ],
+  "metadata": { "version": 1, "a/b": { "~key": "Escaped JSON Pointer example" } },
+  "optional": null
+}

@@ -1,0 +1,26 @@
+[workspace]
+members = ["crates/ravel-core", "crates/ravel-desktop"]
+default-members = ["crates/ravel-desktop"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.92"
+
+[workspace.dependencies]
+libadwaita = { version = "0.9", features = ["v1_6"] }
+gtk = { package = "gtk4", version = "0.11", features = ["v4_12"] }
+sourceview5 = { version = "0.11", features = ["v5_4"] }
+serde_json = { version = "1.0", features = ["preserve_order", "arbitrary_precision"] }
+thiserror = "2.0"
+ravel-core = { path = "crates/ravel-core" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = "warn"
+
+[profile.dev]
+debug = 0
