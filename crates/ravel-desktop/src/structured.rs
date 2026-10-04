@@ -100,6 +100,9 @@ fn container_widget(
         .css_classes(["dim-label"])
         .ellipsize(pango::EllipsizeMode::End)
         .build();
+    let count_attributes = pango::AttrList::new();
+    count_attributes.insert(pango::AttrInt::new_weight(pango::Weight::Normal));
+    count.set_attributes(Some(&count_attributes));
     row.append(&arrow);
     row.append(&key);
     row.append(&count);
@@ -114,7 +117,6 @@ fn container_widget(
         .reveal_child(false)
         .build();
     let built = Rc::new(Cell::new(false));
-    let is_array = document.value_at(pointer).is_some_and(Value::is_array);
     let pointer = pointer.to_owned();
     toggle.connect_clicked(glib::clone!(
         #[weak]
@@ -145,16 +147,12 @@ fn container_widget(
     revealer.connect_reveal_child_notify(glib::clone!(
         #[weak]
         arrow,
-        #[weak]
-        count,
         move |revealer| {
             arrow.set_icon_name(Some(if revealer.reveals_child() {
                 "pan-down-symbolic"
             } else {
                 "pan-end-symbolic"
             }));
-            // Array lengths remain useful context even while their items are shown.
-            count.set_visible(is_array || !revealer.reveals_child());
         }
     ));
 

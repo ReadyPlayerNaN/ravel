@@ -64,10 +64,29 @@ pub fn run(app: &adw::Application) {
         gtk::RevealerTransitionType::SlideDown
     );
     assert!(!revealer.reveals_child());
+    let member_count = root
+        .child()
+        .unwrap()
+        .last_child()
+        .unwrap()
+        .downcast::<gtk::Label>()
+        .unwrap();
+    assert_eq!(member_count.text(), "{} · 3 members");
+    let normal_weight = gtk::pango::AttrList::new();
+    normal_weight.insert(gtk::pango::AttrInt::new_weight(gtk::pango::Weight::Normal));
+    assert_eq!(
+        member_count.attributes().unwrap().to_string(),
+        normal_weight.to_string()
+    );
+    assert!(member_count.is_visible());
     root.emit_clicked();
     wait_for(|| {
         revealer.reveals_child() && revealer.is_child_revealed() && toggles(&structured).len() == 3
     });
+    assert!(
+        member_count.is_visible(),
+        "Expanded objects must retain their member count"
+    );
     let users = toggles(&structured)
         .into_iter()
         .find(|toggle| key_text(toggle) == "users")
@@ -81,6 +100,10 @@ pub fn run(app: &adw::Application) {
         .downcast::<gtk::Label>()
         .unwrap();
     assert_eq!(count.text(), "[] · 2 items");
+    assert_eq!(
+        count.attributes().unwrap().to_string(),
+        normal_weight.to_string()
+    );
     assert!(count.is_visible());
     users.emit_clicked();
     assert!(
