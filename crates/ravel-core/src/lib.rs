@@ -1,4 +1,7 @@
-//! GTK-independent parsing and structural search for JSON documents.
+//! GTK-independent parsing and structural search for JSON and YAML documents.
+//!
+//! YAML is normalized to JSON-compatible values. Multi-document YAML streams
+//! become synthetic arrays; comments, source formatting and tags are not retained.
 //!
 //! JSON Lines is represented as a synthetic array. Paths are RFC 6901 JSON
 //! Pointers into that array (record indices, not physical line numbers).
@@ -9,6 +12,9 @@ use std::sync::Arc;
 use serde_json::Value;
 use thiserror::Error;
 
+mod yaml;
+mod yaml_value;
+
 /// Supported document encodings.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Format {
@@ -16,18 +22,21 @@ pub enum Format {
     Json,
     /// One JSON value per nonblank line.
     JsonLines,
+    /// YAML mappings, sequences and scalars; multiple documents form an array.
+    Yaml,
 }
 
 impl Format {
-    /// Detects JSON Lines by a case-insensitive `.jsonl` extension; defaults to JSON.
+    /// Detects `.jsonl`, `.yaml` and `.yml` case-insensitively; defaults to JSON.
     pub fn from_filename(name: &str) -> Self {
-        if name
+        match name
             .rsplit_once('.')
-            .is_some_and(|(_, ext)| ext.eq_ignore_ascii_case("jsonl"))
+            .map(|(_, ext)| ext.to_ascii_lowercase())
+            .as_deref()
         {
-            Self::JsonLines
-        } else {
-            Self::Json
+            Some("jsonl") => Self::JsonLines,
+            Some("yaml" | "yml") => Self::Yaml,
+            _ => Self::Json,
         }
     }
 }
@@ -69,7 +78,16 @@ pub enum ParseError {
     /// Invalid JSON, including line and column information.
     #[error("Invalid JSON: {0}")]
     Json(#[from] serde_json::Error),
-    /// JSON Lines must be UTF-8 text.
+    /// Invalid YAML, including source diagnostics or unsupported values.
+    #[error("Invalid YAML: {0}")]
+    Yaml(#[source] Box<serde_saphyr::Error>),
+    /// YAML data cannot be represented faithfully by the viewer.
+    #[error("Invalid YAML: {message}")]
+    YamlValue {
+        /// Source diagnostic, including location when available.
+        message: String,
+    },
+    /// Input text must be UTF-8.
     #[error("The document is not UTF-8: {0}")]
     Encoding(#[from] std::str::Utf8Error),
     /// A malformed record at its physical, one-based line number.
@@ -194,10 +212,13 @@ pub struct Document {
     value: Value,
     root: Arc<Node>,
     format: Format,
+    document_count: usize,
 }
 
 impl Document {
-    /// Parses UTF-8 JSON or JSON Lines and builds a browsable tree.
+    /// Parses UTF-8 JSON, JSON Lines or YAML and builds a browsable tree.
+    /// YAML aliases and merges are resolved; multiple YAML documents form an
+    /// array. Empty YAML becomes null. Custom tags and non-JSON values are rejected.
     ///
     /// A leading UTF-8 BOM is accepted. Blank JSON Lines records are skipped;
     /// an empty JSON Lines file is a valid zero-record document.
@@ -207,8 +228,9 @@ impl Document {
     /// original physical line, even when earlier lines were blank.
     pub fn parse(bytes: &[u8], format: Format) -> Result<Self, ParseError> {
         let bytes = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(bytes);
-        let value = match format {
-            Format::Json => serde_json::from_slice(bytes)?,
+        let (value, document_count) = match format {
+            Format::Json => (serde_json::from_slice(bytes)?, 1),
+            Format::Yaml => yaml::parse(std::str::from_utf8(bytes)?)?,
             Format::JsonLines => {
                 let mut records = Vec::new();
                 for (index, line) in std::str::from_utf8(bytes)?.lines().enumerate() {
@@ -221,7 +243,8 @@ impl Document {
                         })?);
                     }
                 }
-                Value::Array(records)
+                let count = records.len();
+                (Value::Array(records), count)
             }
         };
         let root = Node::build(&value, String::new(), "$".into());
@@ -229,7 +252,14 @@ impl Document {
             value,
             root,
             format,
+            document_count,
         })
+    }
+
+    /// Number of source documents: one for JSON, nonblank records for JSON Lines,
+    /// and documents in a YAML stream (zero for empty/comment-only YAML).
+    pub fn document_count(&self) -> usize {
+        self.document_count
     }
 
     /// Returns the unfiltered tree's root.

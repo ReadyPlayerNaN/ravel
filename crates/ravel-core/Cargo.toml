@@ -6,6 +6,8 @@ rust-version.workspace = true
 
 [dependencies]
 serde_json.workspace = true
+serde-saphyr.workspace = true
+serde.workspace = true
 thiserror.workspace = true
 
 [lints]
