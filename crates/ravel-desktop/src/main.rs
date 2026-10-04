@@ -11,6 +11,8 @@ mod tree_navigation;
 mod tree_navigation_tests;
 mod tree_tab;
 mod window;
+#[cfg(test)]
+mod yaml_tests;
 
 #[cfg(test)]
 mod fold_tests;

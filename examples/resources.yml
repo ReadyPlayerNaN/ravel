@@ -1,0 +1,17 @@
+# A YAML stream, shown as a synthetic array of documents.
+---
+kind: ConfigMap
+metadata:
+  name: example-config
+data:
+  message: hello
+---
+kind: Service
+metadata:
+  name: example-service
+spec:
+  ports:
+    - port: 8080
+      protocol: TCP
+---
+null

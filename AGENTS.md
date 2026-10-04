@@ -1,13 +1,17 @@
 # Ravel
 
 Ravel is a read-only GTK4 + Libadwaita document viewer, initially for JSON and
-JSON Lines. Keep the application simple; do not add editing or network services
+JSON Lines, and YAML. Keep the application simple; do not add editing or network services
 without an explicit requirement.
 
 ## Architecture
 
 - `crates/ravel-core`: parsing, document values, JSON Pointers, structural search
-  and filtering. No GTK, GIO, or application-runtime dependencies.
+  and filtering. No GTK, GIO, or application-runtime dependencies. YAML ingestion
+  (`yaml.rs`, `yaml_value.rs`) normalizes to JSON-compatible values; streams with
+  multiple documents become arrays. Preserve null stream slots, reject unsupported
+  values without silent coercion, retain parser budgets, and never enable file
+  includes or external resource loading. Raw and jq consume normalized JSON.
 - `crates/ravel-desktop`: native UI, file opening, application actions, and errors.
   `preview.rs` configures the read-only GtkSourceView JSON preview and binds its
   color scheme to Libadwaita's light/dark theme. `key_index.rs` indexes rendered

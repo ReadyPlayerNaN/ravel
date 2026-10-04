@@ -1,10 +1,10 @@
 [Desktop Entry]
 Type=Application
 Name=Ravel
-Comment=Browse, search and filter JSON documents
+Comment=Explore JSON and YAML documents
 Exec=ravel %F
 Icon=text-x-generic
 Terminal=false
 Categories=GTK;Office;Viewer;
-MimeType=application/json;application/x-ndjson;
+MimeType=application/json;application/x-ndjson;application/yaml;application/x-yaml;text/yaml;text/x-yaml;
 StartupNotify=true

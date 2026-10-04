@@ -1,15 +1,16 @@
 # Ravel
 
 A simple, read-only structured document viewer built with Rust, GTK4 and Libadwaita.
-The initial version focuses on JSON and JSON Lines.
+Supports JSON, JSON Lines and YAML.
 
 ## Initial interface
 
-- Open `.json` and `.jsonl` documents from the native chooser or command line.
+- Open `.json`, `.jsonl`, `.yaml` and `.yml` documents from the native chooser
+  or command line (extensions are case-insensitive).
 - Explore nested objects and arrays in a full-width document view, without a
   separate navigation sidebar. The former sidebar search/type controls are removed.
 - Read document statistics in the footer: value and type counts, object keys,
-  maximum depth, and JSON Lines record count.
+  maximum depth, JSON Lines record count, and YAML document count.
 - Switch between **Structured** (native GTK nodes with animated, lazy expansion)
   and **Raw** (the existing JSON text preview). Structured is the default.
 - Right-click any structured node to copy its JSON or JSON Pointer, or run common
@@ -26,8 +27,9 @@ The initial version focuses on JSON and JSON Lines.
 - Get syntax errors with source locations; a failed open leaves the previous
   document intact. File loading is asynchronous and parsing runs off the UI thread.
 
-Object member order and arbitrary-precision numbers are retained. Statistics
-include the root and JSON Lines' synthetic array; depth counts edges from the root
+Object member order is retained. JSON/JSONL numbers retain arbitrary precision;
+YAML numeric limits are described below. Statistics
+include the root and any synthetic document/record array; depth counts edges from the root
 (a scalar or empty container has depth zero). Keys count object members, while
 strings count string values only. Counts are independent of collapsed nodes.
 This is not a text editor.
@@ -58,6 +60,8 @@ older releases such as Ubuntu 24.04 ship an insufficient Libadwaita version.
 cargo run --locked
 cargo run --locked -- examples/sample.json
 cargo run --locked -- examples/events.jsonl
+cargo run --locked -- examples/sample.yaml
+cargo run --locked -- examples/resources.yml
 ```
 
 Multiple command-line files open in separate windows. Opening from a window's
@@ -125,7 +129,7 @@ object member names remain literal. Names match exactly, including case.
 Pressing or releasing either Shift key updates the highlight without requiring
 mouse movement. Scrolling updates the visible matches under the pointer. Leaving
 a key or opening another document clears the highlight. The interaction is
-local to each JSON preview; it does not modify text or highlight the tree sidebar.
+local to each JSON preview; it does not modify text or highlight structured rows.
 
 ## Code folding (Raw)
 
@@ -146,11 +150,38 @@ inside collapsed blocks.
 The `.jsonl` extension is detected case-insensitively. Each nonblank line must
 contain exactly one JSON value; scalar records are supported. Blank lines are
 skipped and an empty file is valid. Errors report the physical, one-based source
-line. A leading UTF-8 BOM is accepted for either format.
+line. A leading UTF-8 BOM is accepted for all supported formats.
 
 JSON Lines is displayed as a synthetic array. `/0/message`, for example, refers
 to the first nonblank record's `message`, not to a physical line number. JSON
 Pointers escape `/` as `~1` and `~` as `~0`; the root pointer is the empty string.
+
+## YAML conventions
+
+YAML is parsed into the same JSON-compatible value model. Mappings, sequences,
+scalar roots, block strings, anchors, aliases and merge keys are supported.
+Only `true`/`false` are inferred as booleans; `NO`, `yes`, `on` and plain dates
+remain strings. Explicit quoted strings stay strings. Mapping order is retained;
+merge keys are resolved rather than displayed as literal `<<` members.
+
+A single YAML document is displayed directly. A stream with multiple documents
+is a synthetic array: `/0/metadata/name` addresses the first document's name.
+Empty documents and explicit null documents retain their slots. An empty or
+comment-only file displays null and reports zero source documents.
+
+**Raw (JSON)**, Copy JSON, JSON Pointers, statistics and jq operate on normalized
+values, not on original YAML text. Comments, original formatting, anchor names
+and tag metadata are not retained. Structured syntax colors, hover matching,
+folding and keyboard navigation work just as they do for JSON input.
+
+Non-string mapping keys (including numeric keys), duplicate keys, custom or
+unsupported tags, recursive aliases and non-finite numbers are rejected with an
+error, rather than silently changed. Quoted numeric keys are supported. YAML
+integers must fit signed/unsigned 64-bit ranges; larger integers are rejected
+rather than rounded (quote them to retain the digits as strings). YAML floating
+point values use finite IEEE-754 double precision. Parser budgets bound nesting,
+alias expansion, node count and document count. No `!include` or external resource
+loading is enabled. A failed parse leaves the previous document unchanged.
 
 ## Development
 

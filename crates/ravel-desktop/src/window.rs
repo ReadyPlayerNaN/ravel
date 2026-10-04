@@ -16,6 +16,7 @@ struct Viewer {
     text: sourceview5::View,
     hover: Rc<crate::key_hover::KeyHover>,
     structured: Rc<crate::structured::Structured>,
+    raw_page: adw::ViewStackPage,
     _folding: Rc<crate::folding::Folding>,
     pointer: gtk::Label,
     status: gtk::Label,
@@ -33,12 +34,12 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
         .build();
     let toolbar = adw::ToolbarView::new();
     let header = adw::HeaderBar::new();
-    let title = adw::WindowTitle::new("Ravel", "JSON document viewer");
+    let title = adw::WindowTitle::new("Ravel", "JSON and YAML document viewer");
     header.set_title_widget(Some(&title));
     let open = gtk::Button::builder()
         .label("Open…")
         .action_name("win.open")
-        .tooltip_text("Open a JSON document (Ctrl+O)")
+        .tooltip_text("Open a JSON or YAML document (Ctrl+O)")
         .build();
     header.pack_start(&open);
     let spinner = gtk::Spinner::new();
@@ -48,8 +49,8 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
     let stack = gtk::Stack::new();
     let empty = adw::StatusPage::builder()
         .icon_name("text-x-generic-symbolic")
-        .title("Untangle your JSON")
-        .description("Open a .json or .jsonl file to explore its structure.")
+        .title("Untangle your data")
+        .description("Open a .json, .jsonl, .yaml or .yml file to explore its structure.")
         .build();
     let empty_open = gtk::Button::builder()
         .label("Open Document…")
@@ -95,7 +96,7 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
         "Structured",
         "view-list-symbolic",
     );
-    view_stack.add_titled_with_icon(
+    let raw_page = view_stack.add_titled_with_icon(
         &detail_scroll,
         Some("raw"),
         "Raw",
@@ -140,6 +141,7 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
         text,
         hover,
         structured,
+        raw_page,
         _folding: folding,
         pointer,
         status,
@@ -226,9 +228,10 @@ impl Viewer {
             return;
         };
         let filter = gtk::FileFilter::new();
-        filter.set_name(Some("JSON documents (.json, .jsonl)"));
-        filter.add_suffix("json");
-        filter.add_suffix("jsonl");
+        filter.set_name(Some("JSON and YAML documents"));
+        for suffix in ["json", "jsonl", "yaml", "yml"] {
+            filter.add_suffix(suffix);
+        }
         let all = gtk::FileFilter::new();
         all.set_name(Some("All files"));
         all.add_pattern("*");
@@ -320,11 +323,25 @@ impl Viewer {
         self.structured.set_content(document, "");
         self.pointer.set_text("$ (document root)");
         let stats = document.statistics();
-        let format = if document.format() == Format::JsonLines {
-            format!("JSON Lines · {} records", document.root().children.len())
-        } else {
-            "JSON".to_owned()
+        let format = match document.format() {
+            Format::Json => "JSON".to_owned(),
+            Format::JsonLines => format!("JSON Lines · {} records", document.document_count()),
+            Format::Yaml => format!(
+                "YAML · {} {} · Normalized to JSON",
+                document.document_count(),
+                if document.document_count() == 1 {
+                    "document"
+                } else {
+                    "documents"
+                }
+            ),
         };
+        self.raw_page
+            .set_title(Some(if document.format() == Format::Yaml {
+                "Raw (JSON)"
+            } else {
+                "Raw"
+            }));
         self.status.set_text(&format!(
             "{format} · {} values · {} objects · {} arrays · {} keys · {} strings · {} numbers · {} booleans · {} nulls · Depth {} · Read only",
             stats.values, stats.objects, stats.arrays, stats.keys, stats.strings,

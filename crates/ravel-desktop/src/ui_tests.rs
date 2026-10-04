@@ -168,4 +168,5 @@ fn opens_documents_full_width_and_displays_statistics() {
     crate::fold_tests::run(&app);
     crate::structured_tests::run(&app);
     crate::tree_navigation_tests::run(&app);
+    crate::yaml_tests::run(&app);
 }

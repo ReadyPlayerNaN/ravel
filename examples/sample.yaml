@@ -1,0 +1,19 @@
+# YAML mappings, sequences, aliases and merge keys.
+title: Ravel YAML example
+country: NO
+settings: &defaults
+  enabled: true
+  retries: 3
+users:
+  - name: Alice
+    age: 32
+  - name: Bob
+    age: 27
+production:
+  <<: *defaults
+  retries: 5
+description: |
+  A read-only YAML document.
+  Structured view and jq use its normalized JSON values.
+empty: []
+missing: null
