@@ -73,12 +73,26 @@ pub fn run(app: &adw::Application) {
         .find(|toggle| key_text(toggle) == "users")
         .unwrap();
     let users_revealer = revealer_of(&users);
+    let count = users
+        .child()
+        .unwrap()
+        .last_child()
+        .unwrap()
+        .downcast::<gtk::Label>()
+        .unwrap();
+    assert_eq!(count.text(), "[] · 2 items");
+    assert!(count.is_visible());
     users.emit_clicked();
+    assert!(
+        count.is_visible(),
+        "Expanded arrays must retain their element count"
+    );
     wait_for(|| toggles(&structured).len() == 5); // Root, users, metadata, and two record objects.
     // Collapsing hides children but keeps them built; a second expand is instant.
     users.emit_clicked();
     wait_for(|| !users_revealer.reveals_child() && !users_revealer.is_child_revealed());
     assert_eq!(toggles(&structured).len(), 5);
+    assert!(count.is_visible());
     users.emit_clicked();
     wait_for(|| users_revealer.reveals_child());
 

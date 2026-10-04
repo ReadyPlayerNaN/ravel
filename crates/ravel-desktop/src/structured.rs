@@ -114,6 +114,7 @@ fn container_widget(
         .reveal_child(false)
         .build();
     let built = Rc::new(Cell::new(false));
+    let is_array = document.value_at(pointer).is_some_and(Value::is_array);
     let pointer = pointer.to_owned();
     toggle.connect_clicked(glib::clone!(
         #[weak]
@@ -152,8 +153,8 @@ fn container_widget(
             } else {
                 "pan-end-symbolic"
             }));
-            // Show the summary only while collapsed, mirroring the hidden children.
-            count.set_visible(!revealer.reveals_child());
+            // Array lengths remain useful context even while their items are shown.
+            count.set_visible(is_array || !revealer.reveals_child());
         }
     ));
 
