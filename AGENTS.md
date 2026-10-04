@@ -33,6 +33,15 @@ Copied from `~/Work/boardo/.agents/skills`, including their reference material:
 must not depend on Boardo being present on another developer's machine. Original
 skill metadata and attribution are retained. Do not copy Boardo domain rules.
 
+## Git workflow
+
+- Use strict Conventional Commits for every commit.
+- Commit each functional piece of work before starting the next piece; do not
+  carry uncommitted functional changes forward between pieces.
+- Slice plans into small, independently committable functional additions that
+  build on the existing state. Each addition should leave the project in a
+  coherent, working state.
+
 ## Verification
 
 ```sh
