@@ -90,6 +90,31 @@ schemes as Raw, including highlighting of string escapes.
 Some operations are invalid for particular values (for example `tonumber` on
 non-numeric text); jq's error is shown without changing the document.
 
+## Keyboard navigation (Structured)
+
+Click a node row or Tab into the tree to focus it. Keys move focus without changing
+JSON or running jq:
+
+| Key | Action |
+| --- | --- |
+| Right | Expand if necessary and focus the first child; no action on a leaf |
+| Left | Collapse an expanded container; otherwise focus its parent |
+| Up / Down | Previous / next visible row, skipping collapsed descendants |
+| Home / End | First / last visible row |
+| Enter / Space | Toggle the focused container |
+| Menu / Shift+F10 | Open that node's Copy/jq context menu |
+| Tab / Shift+Tab | Leave/re-enter the tree using GTK focus traversal |
+
+Focus has a native row indicator; keyboard navigation scrolls the focused row
+into view. Mouse collapse returns focus from a hidden descendant to its parent.
+Nested expansion states survive parent collapse. Scalars and empty containers
+are focusable leaf rows. Modified arrows are left to GTK/application shortcuts.
+
+The map is based on the [W3C tree-view pattern](https://www.w3.org/WAI/ARIA/apg/patterns/treeview/#keyboardinteraction),
+with one intentional difference: classic Right first expands a closed node and
+only enters on the next press; Ravel combines both steps as requested. This is
+focus navigation, not multi-selection; type-ahead and expand-all are not implemented.
+
 ## Key hover (Raw)
 
 Try `cargo run --locked -- examples/hover.json`. Hovering a `name` key highlights
@@ -141,7 +166,9 @@ The core can be tested without GTK development libraries:
 cargo test -p ravel-core --locked
 ```
 
-The ignored GTK smoke test exercises real widgets. With Xvfb installed:
+The ignored GTK smoke test exercises real widgets. Install `xdotool` alongside
+Xvfb to also run native X11 arrow/Tab keystroke checks (CI installs both).
+With Xvfb installed:
 
 ```sh
 GDK_BACKEND=x11 GSK_RENDERER=cairo GTK_A11Y=none GIO_USE_VFS=local \

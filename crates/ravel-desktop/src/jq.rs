@@ -135,6 +135,22 @@ pub fn context_menu(kind: Kind, pointer: &str) -> gio::Menu {
 /// Attaches a secondary-click context menu to a structured-view node row.
 pub fn attach_menu(widget: &impl IsA<gtk::Widget>, kind: Kind, pointer: &str) {
     let pointer = pointer.to_owned();
+    let keys = gtk::EventControllerKey::new();
+    let menu_widget = widget.upcast_ref::<gtk::Widget>().downgrade();
+    let key_pointer = pointer.clone();
+    keys.connect_key_pressed(move |_, key, _, modifiers| {
+        if (key == gdk::Key::Menu && modifiers.is_empty())
+            || (key == gdk::Key::F10 && modifiers == gdk::ModifierType::SHIFT_MASK)
+        {
+            if let Some(widget) = menu_widget.upgrade() {
+                popup(&widget, kind, &key_pointer, 0, widget.height());
+            }
+            glib::Propagation::Stop
+        } else {
+            glib::Propagation::Proceed
+        }
+    });
+    widget.add_controller(keys);
     let gesture = gtk::GestureClick::new();
     gesture.set_button(gdk::BUTTON_SECONDARY);
     gesture.set_propagation_phase(gtk::PropagationPhase::Capture);
@@ -144,19 +160,23 @@ pub fn attach_menu(widget: &impl IsA<gtk::Widget>, kind: Kind, pointer: &str) {
         let Some(menu_widget) = menu_widget.upgrade() else {
             return;
         };
-        let popover = gtk::PopoverMenu::from_model(Some(&context_menu(kind, &pointer)));
-        popover.set_has_arrow(false);
-        popover.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
-        popover.set_parent(&menu_widget);
-        popover.popup();
-        popover.connect_closed(move |popover| {
-            // Menu items dispatch their action after closing. Keep the widget
-            // ancestry intact until that dispatch can resolve the win actions.
-            let popover = popover.clone();
-            glib::idle_add_local_once(move || popover.unparent());
-        });
+        popup(&menu_widget, kind, &pointer, x as i32, y as i32);
     });
     widget.add_controller(gesture);
+}
+
+fn popup(widget: &gtk::Widget, kind: Kind, pointer: &str, x: i32, y: i32) {
+    crate::tree_navigation::focus(widget);
+    let popover = gtk::PopoverMenu::from_model(Some(&context_menu(kind, pointer)));
+    popover.set_has_arrow(false);
+    popover.set_pointing_to(Some(&gdk::Rectangle::new(x, y, 1, 1)));
+    popover.set_parent(widget);
+    popover.popup();
+    popover.connect_closed(move |popover| {
+        // Action lookup needs the ancestry until menu dispatch completes.
+        let popover = popover.clone();
+        glib::idle_add_local_once(move || popover.unparent());
+    });
 }
 
 /// Runs `jq program` with `input` on stdin, returning stdout or jq's error.

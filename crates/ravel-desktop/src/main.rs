@@ -6,6 +6,10 @@ mod key_index;
 mod preview;
 mod structured;
 mod syntax_label;
+mod tree_navigation;
+#[cfg(test)]
+mod tree_navigation_tests;
+mod tree_tab;
 mod window;
 
 #[cfg(test)]

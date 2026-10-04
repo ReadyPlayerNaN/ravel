@@ -14,7 +14,7 @@ jobs:
     container: fedora:43
     steps:
       - name: Install native dependencies
-        run: dnf install -y gcc git curl-minimal tar pkgconf-pkg-config gtk4-devel libadwaita-devel gtksourceview5-devel jq xorg-x11-server-Xvfb dbus-daemon mesa-dri-drivers
+        run: dnf install -y gcc git curl-minimal tar pkgconf-pkg-config gtk4-devel libadwaita-devel gtksourceview5-devel jq xorg-x11-server-Xvfb xdotool dbus-daemon mesa-dri-drivers
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:

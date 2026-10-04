@@ -27,10 +27,13 @@ pub fn create() -> (gtk::Widget, Rc<Structured>) {
         .margin_end(6)
         .build();
     column.set_widget_name("structured-view");
+    crate::tree_navigation::install(&column);
     let scrolled = gtk::ScrolledWindow::builder()
         .child(&column)
         .hscrollbar_policy(gtk::PolicyType::Never)
         .build();
+    // The active row is the tree's sole tab stop, not the scrolling container.
+    scrolled.set_focusable(false);
     (scrolled.upcast(), Rc::new(Structured { column }))
 }
 
@@ -72,6 +75,7 @@ fn node_widget(document: &Arc<Document>, pointer: &str, label: &str, depth: i32)
             .filter(|child| child.is::<gtk::Button>())
             .unwrap_or_else(|| widget.clone());
         crate::jq::attach_menu(&target, kind, pointer);
+        crate::tree_navigation::install_row(&target, depth == 0);
     }
     widget
 }
@@ -84,6 +88,7 @@ fn container_widget(
     summary: &str,
 ) -> gtk::Widget {
     let column = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    column.set_widget_name("node-container");
     let toggle = gtk::Button::builder()
         .css_classes(["flat"])
         .halign(gtk::Align::Start)
@@ -129,7 +134,8 @@ fn container_widget(
         pointer,
         #[strong]
         built,
-        move |_| {
+        move |button| {
+            crate::tree_navigation::recover_before_collapse(button.upcast_ref(), &revealer);
             if !built.get() {
                 built.set(true);
                 for (child_pointer, child_label) in member_pointers(&document, &pointer) {
@@ -179,10 +185,16 @@ fn scalar_widget(document: &Arc<Document>, pointer: &str, label: &str, depth: i3
         .tooltip_text(&preview)
         .selectable(true)
         .build();
+    value.set_focusable(false);
     crate::syntax_label::apply(&value, &preview, 0, preview.len());
     row.append(&key);
     row.append(&value);
-    row.upcast()
+    let node = gtk::Button::builder()
+        .child(&row)
+        .css_classes(["flat"])
+        .build();
+    node.set_widget_name("node-row");
+    node.upcast()
 }
 
 fn revealer_toggle(revealer: &gtk::Revealer) {
