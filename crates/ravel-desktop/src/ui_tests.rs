@@ -24,7 +24,7 @@ fn find<T: IsA<gtk::Widget> + glib::object::ObjectType>(
 }
 
 #[track_caller]
-fn wait_for(mut condition: impl FnMut() -> bool) {
+pub(crate) fn wait_for(mut condition: impl FnMut() -> bool) {
     let deadline = Instant::now() + Duration::from_secs(10);
     while !condition() {
         while glib::MainContext::default().pending() {
@@ -174,4 +174,5 @@ fn opens_documents_searches_filters_and_displays_selected_json() {
     styles.set_color_scheme(original_scheme);
     window.close();
     events.close();
+    crate::hover_tests::run(&app);
 }

@@ -1,0 +1,8 @@
+{
+  "users": [
+    { "name": "Alice" },
+    { "name": "Bob" }
+  ],
+  "metadata": { "name": "Ravel" },
+  "value": "name"
+}

@@ -13,6 +13,9 @@ The initial version focuses on JSON and JSON Lines.
 - Read syntax-highlighted JSON for the selected value and copy it to the clipboard.
   GtkSourceView colors keys, strings, escapes, numbers, booleans, and null, with
   an Adwaita color scheme that follows the application's light/dark theme.
+- Hover a key in the JSON preview to highlight same-name keys in the visible
+  viewport. Hold Shift to match their structural path too, with array indices
+  treated as wildcards. String values are never matched as keys.
 - Get syntax errors with source locations; a failed open leaves the previous
   document intact. File loading is asynchronous and parsing runs off the UI thread.
 
@@ -55,6 +58,18 @@ chooser replaces its current document only after a successful parse.
 | Ctrl+F | Focus structural search |
 | Ctrl+W | Close window |
 | Ctrl+Q | Quit |
+
+## Key hover
+
+Try `cargo run --locked -- examples/hover.json`. Hovering a `name` key highlights
+all visible `name` keys. Shift-hovering `/users/0/name` matches `/users/1/name`
+but excludes `/metadata/name`. Only actual array indices are wildcarded; numeric
+object member names remain literal. Names match exactly, including case.
+
+Pressing or releasing either Shift key updates the highlight without requiring
+mouse movement. Scrolling updates the visible matches under the pointer. Leaving
+a key or changing the selected value clears the highlight. The interaction is
+local to each JSON preview; it does not modify text or highlight the tree sidebar.
 
 ## JSON Lines conventions
 

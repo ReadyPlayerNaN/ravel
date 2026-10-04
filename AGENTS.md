@@ -10,7 +10,9 @@ without an explicit requirement.
   and filtering. No GTK, GIO, or application-runtime dependencies.
 - `crates/ravel-desktop`: native UI, file opening, application actions, and errors.
   `preview.rs` configures the read-only GtkSourceView JSON preview and binds its
-  color scheme to Libadwaita's light/dark theme. Keep highlighting in this layer.
+  color scheme to Libadwaita's light/dark theme. `key_index.rs` indexes rendered
+  keys and their array-wildcard structural paths; `key_hover.rs` handles pointer,
+  Shift, and viewport highlighting. Keep highlighting in this layer.
   Use the GLib main context for UI tasks and GIO's worker pool for parsing.
 - `examples`: small documents for manual and automated smoke tests.
 

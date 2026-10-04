@@ -27,6 +27,7 @@ struct Viewer {
     kind: gtk::DropDown,
     selection: gtk::SingleSelection,
     text: sourceview5::View,
+    hover: Rc<crate::key_hover::KeyHover>,
     pointer: gtk::Label,
     status: gtk::Label,
     spinner: gtk::Spinner,
@@ -169,6 +170,7 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
     stack.set_visible_child_name("empty");
     toolbar.set_content(Some(&stack));
     window.set_content(Some(&toolbar));
+    let hover = crate::key_hover::KeyHover::install(&text, &window);
 
     let viewer = Rc::new(Viewer {
         window: window.downgrade(),
@@ -179,6 +181,7 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
         kind,
         selection,
         text,
+        hover,
         pointer,
         status,
         spinner,
@@ -391,14 +394,15 @@ impl Viewer {
         };
         let node = object.borrow::<Arc<Node>>();
         let document = self.document.borrow();
-        let Some(value) = document
-            .as_ref()
-            .and_then(|document| document.value_at(&node.pointer))
+        let Some(document) = document.as_ref() else {
+            return;
+        };
+        let (Some(root), Some(value)) = (document.value_at(""), document.value_at(&node.pointer))
         else {
             return;
         };
         match serde_json::to_string_pretty(value) {
-            Ok(text) => self.text.buffer().set_text(&text),
+            Ok(text) => self.hover.set_content(root, &node.pointer, &text),
             Err(error) => {
                 self.show_error(&error.to_string());
                 return;
