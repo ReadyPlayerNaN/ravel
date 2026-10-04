@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 
 use crate::{key_hover::KeyHover, ui_tests::wait_for};
 
-fn controller(widget: &impl IsA<gtk::Widget>, name: &str) -> gtk::EventController {
+pub(crate) fn controller(widget: &impl IsA<gtk::Widget>, name: &str) -> gtk::EventController {
     let controllers = widget.observe_controllers();
     (0..controllers.n_items())
         .find_map(|index| {
@@ -17,14 +17,14 @@ fn controller(widget: &impl IsA<gtk::Widget>, name: &str) -> gtk::EventControlle
         .unwrap()
 }
 
-fn offsets(buffer: &gtk::TextBuffer, token: &str) -> Vec<i32> {
-    let text = buffer.text(&buffer.start_iter(), &buffer.end_iter(), false);
+pub(crate) fn offsets(buffer: &gtk::TextBuffer, token: &str) -> Vec<i32> {
+    let text = buffer.text(&buffer.start_iter(), &buffer.end_iter(), true);
     text.match_indices(token)
         .map(|(byte, _)| i32::try_from(text[..byte].chars().count()).unwrap())
         .collect()
 }
 
-fn motion_at(view: &sourceview5::View, motion: &gtk::EventController, offset: i32) {
+pub(crate) fn motion_at(view: &sourceview5::View, motion: &gtk::EventController, offset: i32) {
     let rect = view.iter_location(&view.buffer().iter_at_offset(offset));
     let (x, y) = view.buffer_to_window_coords(gtk::TextWindowType::Widget, rect.x(), rect.y());
     motion.emit_by_name::<()>(

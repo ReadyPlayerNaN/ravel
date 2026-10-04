@@ -12,7 +12,9 @@ without an explicit requirement.
   `preview.rs` configures the read-only GtkSourceView JSON preview and binds its
   color scheme to Libadwaita's light/dark theme. `key_index.rs` indexes rendered
   keys and their array-wildcard structural paths; `key_hover.rs` handles pointer,
-  Shift, and viewport highlighting. Keep highlighting in this layer.
+  Shift, and viewport highlighting. `fold_index.rs` indexes container body lines;
+  `folding.rs` contributes gutter controls and non-destructive visibility tags.
+  Keep highlighting and folding in this layer; copied text includes hidden content.
   Use the GLib main context for UI tasks and GIO's worker pool for parsing.
 - `examples`: small documents for manual and automated smoke tests.
 

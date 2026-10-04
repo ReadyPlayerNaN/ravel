@@ -23,7 +23,7 @@ pub fn create() -> sourceview::View {
         .sync_create()
         .build();
 
-    sourceview::View::builder()
+    let view = sourceview::View::builder()
         .buffer(&buffer)
         .editable(false)
         .monospace(true)
@@ -33,5 +33,13 @@ pub fn create() -> sourceview::View {
         .top_margin(12)
         .bottom_margin(12)
         .wrap_mode(gtk::WrapMode::None)
-        .build()
+        .build();
+    view.connect_copy_clipboard(|view| {
+        let buffer = view.buffer();
+        if let Some((start, end)) = buffer.selection_bounds() {
+            view.clipboard().set_text(&buffer.text(&start, &end, true));
+        }
+        view.stop_signal_emission_by_name("copy-clipboard");
+    });
+    view
 }

@@ -16,6 +16,8 @@ The initial version focuses on JSON and JSON Lines.
 - Hover a key in the JSON preview to highlight same-name keys in the visible
   viewport. Hold Shift to match their structural path too, with array indices
   treated as wildcards. String values are never matched as keys.
+- Collapse or expand any multiline JSON object or array with the preview's
+  gutter arrows, including nested blocks and JSON Lines records.
 - Get syntax errors with source locations; a failed open leaves the previous
   document intact. File loading is asynchronous and parsing runs off the UI thread.
 
@@ -70,6 +72,21 @@ Pressing or releasing either Shift key updates the highlight without requiring
 mouse movement. Scrolling updates the visible matches under the pointer. Leaving
 a key or changing the selected value clears the highlight. The interaction is
 local to each JSON preview; it does not modify text or highlight the tree sidebar.
+
+## Code folding
+
+Click **▼** beside an object or array's opening line to collapse its body; click
+**▶** to expand it again. Opening and closing lines remain visible, with their
+original indentation. Empty inline containers and scalars have nothing to fold.
+
+Nested blocks fold independently. Expanding a parent preserves any previously
+collapsed children. Folds reset when the preview content is replaced, such as
+when selecting another value or opening a document. This does not change the
+sidebar tree's expansion state.
+
+Folding only hides text: the document is unchanged. The Copy JSON button and
+selection copying (Ctrl+C) include folded content. Hover matching excludes keys
+inside collapsed blocks.
 
 ## JSON Lines conventions
 

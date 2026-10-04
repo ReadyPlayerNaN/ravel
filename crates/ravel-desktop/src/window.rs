@@ -28,6 +28,7 @@ struct Viewer {
     selection: gtk::SingleSelection,
     text: sourceview5::View,
     hover: Rc<crate::key_hover::KeyHover>,
+    _folding: Rc<crate::folding::Folding>,
     pointer: gtk::Label,
     status: gtk::Label,
     spinner: gtk::Spinner,
@@ -135,6 +136,7 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
         .tooltip_text("Copy selected JSON")
         .css_classes(["flat"])
         .build();
+    copy.set_widget_name("copy-json");
     detail_header.append(&pointer);
     detail_header.append(&copy);
     detail.append(&detail_header);
@@ -171,6 +173,7 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
     toolbar.set_content(Some(&stack));
     window.set_content(Some(&toolbar));
     let hover = crate::key_hover::KeyHover::install(&text, &window);
+    let folding = crate::folding::Folding::install(&text);
 
     let viewer = Rc::new(Viewer {
         window: window.downgrade(),
@@ -182,6 +185,7 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
         selection,
         text,
         hover,
+        _folding: folding,
         pointer,
         status,
         spinner,
@@ -227,7 +231,7 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
             viewer.text.clipboard().set_text(&buffer.text(
                 &buffer.start_iter(),
                 &buffer.end_iter(),
-                false,
+                true,
             ));
         }
     ));

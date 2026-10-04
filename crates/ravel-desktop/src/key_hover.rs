@@ -191,7 +191,7 @@ impl KeyHover {
         let hovered = view.iter_at_position(x, y).and_then(|(iter, _)| {
             let rect = view.iter_location(&iter);
             // GTK returns the nearest glyph; blank space is not a key hit.
-            if contains(&rect, x, y) {
+            if contains(&rect, x, y) && !is_hidden(&iter) {
                 index.at(iter.offset())
             } else {
                 None
@@ -211,6 +211,7 @@ impl KeyHover {
                     .in_range(start.offset()..end.offset())
                     .iter()
                     .filter(|key| key.matches(hovered, self.shift.get()))
+                    .filter(|key| !is_hidden(&self.buffer.iter_at_offset(key.span.start)))
                     .filter(|key| intersects(&key_rect(&view, &self.buffer, key), &visible))
                     .map(|key| key.span.clone())
                     .collect()
@@ -240,6 +241,12 @@ impl KeyHover {
         }
         *applied = spans;
     }
+}
+
+fn is_hidden(iter: &gtk::TextIter) -> bool {
+    iter.tags()
+        .iter()
+        .any(|tag| tag.is_invisible_set() && tag.is_invisible())
 }
 
 fn shift_bit(key: gdk::Key) -> u8 {

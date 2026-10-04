@@ -4,7 +4,7 @@ use gtk::{gio, glib};
 use libadwaita::{self as adw, prelude::*};
 use sourceview5::prelude::*;
 
-fn find<T: IsA<gtk::Widget> + glib::object::ObjectType>(
+pub(crate) fn find<T: IsA<gtk::Widget> + glib::object::ObjectType>(
     root: &gtk::Widget,
     name: Option<&str>,
 ) -> Option<T> {
@@ -175,4 +175,5 @@ fn opens_documents_searches_filters_and_displays_selected_json() {
     window.close();
     events.close();
     crate::hover_tests::run(&app);
+    crate::fold_tests::run(&app);
 }
