@@ -96,5 +96,22 @@ pub fn run(app: &adw::Application) {
     events_root.emit_clicked();
     wait_for(|| toggles(&events_structured).len() == 4); // Root plus three records.
     events.close();
+    gtk::prelude::WidgetExt::activate_action(
+        &window,
+        "win.node-jq",
+        Some(&("/users", "length", "Length").to_variant()),
+    )
+    .unwrap();
+    wait_for(|| window.visible_dialog().is_some());
+    let dialog = window.visible_dialog().unwrap();
+    assert_eq!(dialog.title(), "jq: Length");
+    let result = find::<sourceview5::View>(&dialog.clone().upcast::<gtk::Widget>(), None).unwrap();
+    let buffer = result.buffer();
+    assert_eq!(
+        buffer.text(&buffer.start_iter(), &buffer.end_iter(), true),
+        "2"
+    );
+    assert!(!result.is_editable());
+    dialog.close();
     window.close();
 }

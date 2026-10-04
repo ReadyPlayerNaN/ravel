@@ -1,6 +1,6 @@
 # Ravel
 
-A simple, read-only text document viewer built with Rust, GTK4 and Libadwaita.
+A simple, read-only structured document viewer built with Rust, GTK4 and Libadwaita.
 The initial version focuses on JSON and JSON Lines.
 
 ## Initial interface
@@ -10,7 +10,12 @@ The initial version focuses on JSON and JSON Lines.
 - Search keys, JSON Pointer paths, and complete scalar values (case-insensitive).
 - Combine search with a value-type filter: object, array, string, number,
   boolean, or null. Ancestors remain visible to provide context.
-- Read syntax-highlighted JSON for the selected value and copy it to the clipboard.
+- Switch between **Structured** (native GTK nodes with animated, lazy expansion)
+  and **Raw** (the existing JSON text preview). Structured is the default.
+- Right-click any structured node to copy its JSON or JSON Pointer, or run common
+  type-specific **jq** operations. Results open in a read-only, copyable dialog;
+  the original document is never changed.
+- Read syntax-highlighted JSON in Raw for the selected value and copy it to the clipboard.
   GtkSourceView colors keys, strings, escapes, numbers, booleans, and null, with
   an Adwaita color scheme that follows the application's light/dark theme.
 - Hover a key in the JSON preview to highlight same-name keys in the visible
@@ -31,16 +36,18 @@ search, not JSONPath, regex search, or a text editor.
 - GTK **4.12+** development libraries.
 - Libadwaita **1.6+** development libraries.
 - GtkSourceView **5.4+** development libraries.
+- `jq` on `PATH` for node operations and desktop integration tests; viewing works
+  without it and operations report a clear error if it is missing.
 - A graphical session (Wayland or X11) to run the application.
 
 On a recent Fedora release:
 
 ```sh
-sudo dnf install gcc pkgconf-pkg-config gtk4-devel libadwaita-devel gtksourceview5-devel
+sudo dnf install gcc pkgconf-pkg-config gtk4-devel libadwaita-devel gtksourceview5-devel jq
 ```
 
 Debian/Ubuntu package names are `build-essential`, `pkg-config`, `libgtk-4-dev`
-`libadwaita-1-dev` and `libgtksourceview-5-dev`; check the versions above, since
+`libadwaita-1-dev`, `libgtksourceview-5-dev` and `jq`; check the versions above, since
 older releases such as Ubuntu 24.04 ship an insufficient Libadwaita version.
 
 ## Run
@@ -61,7 +68,18 @@ chooser replaces its current document only after a successful parse.
 | Ctrl+W | Close window |
 | Ctrl+Q | Quit |
 
-## Key hover
+## Structured nodes and jq
+
+Expand a container by clicking its row; children appear with a 250 ms slide
+animation and are built only on first expansion. Right-click its row (or a scalar
+row) for a custom node menu. Object operations include keys, values, length and
+entries; arrays offer sorting, uniqueness, reversal, flattening and aggregation;
+strings offer case conversion and numeric conversion. Every type offers `type`.
+Each filter runs against that node alone, using jq stdin rather than a shell.
+Some operations are invalid for particular values (for example `tonumber` on
+non-numeric text); jq's error is shown without changing the document.
+
+## Key hover (Raw)
 
 Try `cargo run --locked -- examples/hover.json`. Hovering a `name` key highlights
 all visible `name` keys. Shift-hovering `/users/0/name` matches `/users/1/name`
@@ -73,7 +91,7 @@ mouse movement. Scrolling updates the visible matches under the pointer. Leaving
 a key or changing the selected value clears the highlight. The interaction is
 local to each JSON preview; it does not modify text or highlight the tree sidebar.
 
-## Code folding
+## Code folding (Raw)
 
 Click **▼** beside an object or array's opening line to collapse its body; click
 **▶** to expand it again. Opening and closing lines remain visible, with their

@@ -1,5 +1,6 @@
 mod fold_index;
 mod folding;
+mod jq;
 mod key_hover;
 mod key_index;
 mod preview;

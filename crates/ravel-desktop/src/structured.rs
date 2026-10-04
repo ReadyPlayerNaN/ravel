@@ -4,7 +4,7 @@ use std::{cell::Cell, rc::Rc, sync::Arc};
 
 use gtk::{glib, pango};
 use libadwaita::prelude::*;
-use ravel_core::Document;
+use ravel_core::{Document, Kind};
 use serde_json::Value;
 
 /// Animated expand/collapse duration in milliseconds.
@@ -48,7 +48,7 @@ impl Structured {
 }
 
 fn node_widget(document: &Arc<Document>, pointer: &str, label: &str, depth: i32) -> gtk::Widget {
-    match document.value_at(pointer) {
+    let widget = match document.value_at(pointer) {
         Some(Value::Object(members)) if !members.is_empty() => container_widget(
             document,
             pointer,
@@ -64,7 +64,16 @@ fn node_widget(document: &Arc<Document>, pointer: &str, label: &str, depth: i32)
             &format!("[] · {} items", items.len()),
         ),
         _ => scalar_widget(document, pointer, label, depth),
+    };
+    if let Some(kind) = document.value_at(pointer).map(Kind::of) {
+        // Container menus belong to the header, not its descendants.
+        let target = widget
+            .first_child()
+            .filter(|child| child.is::<gtk::Button>())
+            .unwrap_or_else(|| widget.clone());
+        crate::jq::attach_menu(&target, kind, pointer);
     }
+    widget
 }
 
 fn container_widget(

@@ -222,6 +222,46 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
         move |_, _| viewer.choose_file()
     ));
     window.add_action(&open_action);
+    let node_copy = gio::SimpleAction::new("node-copy", Some(glib::VariantTy::STRING));
+    node_copy.connect_activate(glib::clone!(
+        #[weak]
+        viewer,
+        move |_, pointer| {
+            viewer.copy_node(
+                pointer.and_then(|value| value.str()).unwrap_or_default(),
+                false,
+            );
+        }
+    ));
+    window.add_action(&node_copy);
+    let node_pointer = gio::SimpleAction::new("node-pointer", Some(glib::VariantTy::STRING));
+    node_pointer.connect_activate(glib::clone!(
+        #[weak]
+        viewer,
+        move |_, pointer| {
+            viewer.copy_node(
+                pointer.and_then(|value| value.str()).unwrap_or_default(),
+                true,
+            );
+        }
+    ));
+    window.add_action(&node_pointer);
+    let node_jq = gio::SimpleAction::new(
+        "node-jq",
+        Some(&<(String, String, String)>::static_variant_type()),
+    );
+    node_jq.connect_activate(glib::clone!(
+        #[weak]
+        viewer,
+        move |_, target| {
+            if let Some((pointer, program, label)) =
+                target.and_then(|value| value.get::<(String, String, String)>())
+            {
+                viewer.run_jq(&pointer, &program, &label);
+            }
+        }
+    ));
+    window.add_action(&node_jq);
     let search_action = gio::SimpleAction::new("search", None);
     search_action.connect_activate(glib::clone!(
         #[weak]
@@ -442,6 +482,54 @@ impl Viewer {
             &node.pointer
         });
         self.pointer.set_tooltip_text(Some(&node.pointer));
+    }
+
+    /// Copies a node's JSON or its JSON Pointer to the clipboard.
+    fn copy_node(&self, pointer: &str, as_pointer: bool) {
+        let document = self.document.borrow();
+        let text = if as_pointer {
+            Some(pointer.to_owned())
+        } else {
+            document
+                .as_ref()
+                .and_then(|document| document.value_at(pointer))
+                .and_then(|value| serde_json::to_string_pretty(value).ok())
+        };
+        if let Some(text) = text
+            && let Some(window) = self.window.upgrade()
+        {
+            window.clipboard().set_text(&text);
+        }
+    }
+
+    /// Runs a jq operation on a node and presents the result in a dialog.
+    fn run_jq(self: &Rc<Self>, pointer: &str, program: &str, label: &str) {
+        let document = self.document.borrow();
+        let Some(value) = document
+            .as_ref()
+            .and_then(|document| document.value_at(pointer))
+        else {
+            return;
+        };
+        let Ok(input) = serde_json::to_string(value) else {
+            return;
+        };
+        let title = format!("jq: {label}");
+        let program = program.to_owned();
+        glib::spawn_future_local(glib::clone!(
+            #[weak(rename_to = viewer)]
+            self,
+            async move {
+                match crate::jq::run(&program, &input).await {
+                    Ok(output) => {
+                        if let Some(window) = viewer.window.upgrade() {
+                            crate::jq::show_result(&window, &title, &output);
+                        }
+                    }
+                    Err(message) => viewer.show_error(&message),
+                }
+            }
+        ));
     }
 
     fn show_error(&self, message: &str) {
