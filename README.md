@@ -12,11 +12,12 @@ Supports JSON, JSON Lines and YAML.
 - Read document statistics in the footer: value and type counts, object keys,
   maximum depth, JSON Lines record count, and YAML document count.
 - Switch between **Structured** (native GTK nodes with animated, lazy expansion)
-  and **Raw** (the existing JSON text preview). Structured is the default.
+  and **Raw** (JSON preview) or **Raw YAML** (original YAML source).
+  Structured is the default.
 - Right-click any structured node to copy its JSON or JSON Pointer, or run common
   type-specific **jq** operations. Results open in a read-only, copyable dialog;
   the original document is never changed.
-- Read syntax-highlighted JSON in Raw for the document and copy it to the clipboard.
+- Read syntax-highlighted JSON or YAML in Raw and copy it to the clipboard.
   GtkSourceView colors keys, strings, escapes, numbers, booleans, and null, with
   an Adwaita color scheme that follows the application's light/dark theme.
 - Hover a key in the JSON preview to highlight same-name keys in the visible
@@ -119,7 +120,7 @@ with one intentional difference: classic Right first expands a closed node and
 only enters on the next press; Ravel combines both steps as requested. This is
 focus navigation, not multi-selection; type-ahead and expand-all are not implemented.
 
-## Key hover (Raw)
+## Key hover (Raw JSON)
 
 Try `cargo run --locked -- examples/hover.json`. Hovering a `name` key highlights
 all visible `name` keys. Shift-hovering `/users/0/name` matches `/users/1/name`
@@ -131,7 +132,7 @@ mouse movement. Scrolling updates the visible matches under the pointer. Leaving
 a key or opening another document clears the highlight. The interaction is
 local to each JSON preview; it does not modify text or highlight structured rows.
 
-## Code folding (Raw)
+## Code folding (Raw JSON)
 
 Click **▼** beside an object or array's opening line to collapse its body; click
 **▶** to expand it again. Opening and closing lines remain visible, with their
@@ -169,10 +170,17 @@ is a synthetic array: `/0/metadata/name` addresses the first document's name.
 Empty documents and explicit null documents retain their slots. An empty or
 comment-only file displays null and reports zero source documents.
 
-**Raw (JSON)**, Copy JSON, JSON Pointers, statistics and jq operate on normalized
-values, not on original YAML text. Comments, original formatting, anchor names
-and tag metadata are not retained. Structured syntax colors, hover matching,
-folding and keyboard navigation work just as they do for JSON input.
+**Raw YAML** shows the original source with YAML syntax highlighting, preserving
+comments, formatting, anchor names, merge expressions and document separators
+(a leading UTF-8 BOM is stripped). The header Copy button copies YAML source;
+selection copying in Raw copies the selected source text.
+
+Structured view, its per-node Copy JSON menus, JSON Pointers, statistics and jq
+operate on normalized values. Structured colors, animated expansion and keyboard
+navigation remain available. JSON key-hover matching and delimiter gutter folding
+are disabled in Raw YAML; they would interpret YAML strings and flow syntax
+incorrectly. Parsed values do not retain comment or tag metadata, but original
+source does.
 
 Non-string mapping keys (including numeric keys), duplicate keys, custom or
 unsupported tags, recursive aliases and non-finite numbers are rejected with an
@@ -215,8 +223,8 @@ explained in `AGENTS.md`.
 
 Documents and their structural index are held in memory. Pretty-printing
 currently runs on the UI thread; this first version
-is for small to medium documents, not multi-gigabyte log streaming. Original
-whitespace is not retained. Editing, JSONPath, pagination, packaging and other
+is for small to medium documents, not multi-gigabyte log streaming. JSON whitespace
+is not retained; YAML source text is retained for Raw YAML. Editing, JSONPath, pagination, packaging and other
 text formats are not implemented yet.
 
 `data/io.github.ravel.Ravel.desktop` is a starter desktop entry for an installed

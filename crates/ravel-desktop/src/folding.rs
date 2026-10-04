@@ -1,4 +1,7 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 use gtk::glib;
 use sourceview5::{self as sourceview, prelude::*};
@@ -14,6 +17,7 @@ pub struct Folding {
     buffer: gtk::TextBuffer,
     renderer: glib::WeakRef<sourceview::GutterRendererText>,
     regions: RefCell<Vec<Region>>,
+    enabled: Cell<bool>,
 }
 
 impl Folding {
@@ -33,6 +37,7 @@ impl Folding {
             buffer: view.buffer(),
             renderer: renderer.downgrade(),
             regions: RefCell::new(Vec::new()),
+            enabled: Cell::new(true),
         });
         renderer.connect_query_data(glib::clone!(
             #[weak]
@@ -86,6 +91,15 @@ impl Folding {
         folding
     }
 
+    /// JSON delimiter folding is not valid for original YAML source.
+    pub fn set_enabled(&self, enabled: bool) {
+        self.enabled.set(enabled);
+        if let Some(renderer) = self.renderer.upgrade() {
+            renderer.set_visible(enabled);
+        }
+        self.rebuild();
+    }
+
     fn line_visible(&self, line: u32) -> bool {
         i32::try_from(line)
             .ok()
@@ -108,10 +122,12 @@ impl Folding {
         let text = self
             .buffer
             .text(&self.buffer.start_iter(), &self.buffer.end_iter(), true);
-        *regions = fold_index::blocks(&text)
-            .into_iter()
-            .map(|block| Region { block, tag: None })
-            .collect();
+        if self.enabled.get() {
+            *regions = fold_index::blocks(&text)
+                .into_iter()
+                .map(|block| Region { block, tag: None })
+                .collect();
+        }
         if let Some(renderer) = self.renderer.upgrade() {
             renderer.queue_draw();
         }

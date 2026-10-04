@@ -16,21 +16,22 @@ pub fn run(app: &adw::Application) {
     let stack = find::<adw::ViewStack>(&widget, Some("view-stack")).unwrap();
     assert_eq!(stack.visible_child_name().as_deref(), Some("structured"));
     let status = find::<gtk::Label>(&widget, Some("document-statistics")).unwrap();
-    assert!(
-        status
-            .text()
-            .starts_with("YAML · 1 document · Normalized to JSON")
-    );
+    assert!(status.text().starts_with("YAML · 1 document"));
     let source = find::<sourceview5::View>(&widget, None).unwrap();
     let buffer = source.buffer();
     let text = buffer.text(&buffer.start_iter(), &buffer.end_iter(), true);
-    let value: serde_json::Value = serde_json::from_str(&text).unwrap();
-    assert_eq!(value["country"], "NO");
-    assert_eq!(value["production"]["enabled"], true);
-    assert_eq!(value["production"]["retries"], 5);
+    assert_eq!(
+        text.as_str(),
+        std::fs::read_to_string(examples.join("sample.yaml")).unwrap()
+    );
+    assert!(
+        text.contains("# YAML") && text.contains("&defaults") && text.contains("<<: *defaults")
+    );
     assert!(!source.is_editable());
     let scroll = source.ancestor(gtk::ScrolledWindow::static_type()).unwrap();
-    assert_eq!(stack.page(&scroll).title().as_deref(), Some("Raw (JSON)"));
+    assert_eq!(stack.page(&scroll).title().as_deref(), Some("Raw YAML"));
+    stack.set_property("visible-child-name", "raw");
+    wait_for(|| source.is_mapped());
     assert_eq!(
         buffer
             .downcast::<sourceview5::Buffer>()
@@ -38,8 +39,48 @@ pub fn run(app: &adw::Application) {
             .language()
             .unwrap()
             .id(),
-        "json"
+        "yaml"
     );
+    let syntax = source.buffer().downcast::<sourceview5::Buffer>().unwrap();
+    syntax.ensure_highlight(&syntax.start_iter(), &syntax.end_iter());
+    let colored = |needle: &str| {
+        let byte = text.find(needle).unwrap();
+        syntax
+            .iter_at_offset(text[..byte].chars().count() as i32)
+            .tags()
+            .into_iter()
+            .any(|tag| tag.is_foreground_set())
+    };
+    assert!(colored("# YAML"));
+    assert!(colored("true"));
+    let folds = find::<sourceview5::GutterRendererText>(&widget, Some("code-folds")).unwrap();
+    assert!(
+        !folds.is_visible(),
+        "JSON delimiter folding must not operate on YAML source"
+    );
+    let copy = find::<gtk::Button>(&widget, Some("copy-json")).unwrap();
+    assert_eq!(copy.tooltip_text().as_deref(), Some("Copy YAML source"));
+    copy.emit_clicked();
+    assert_eq!(
+        gtk::glib::MainContext::default()
+            .block_on(source.clipboard().read_text_future())
+            .unwrap()
+            .unwrap(),
+        text
+    );
+    gtk::prelude::WidgetExt::activate_action(
+        &window,
+        "win.node-copy",
+        Some(&"/production".to_variant()),
+    )
+    .unwrap();
+    let node_json = gtk::glib::MainContext::default()
+        .block_on(source.clipboard().read_text_future())
+        .unwrap()
+        .unwrap();
+    let node: serde_json::Value = serde_json::from_str(&node_json).unwrap();
+    assert_eq!(node["enabled"], true);
+    assert_eq!(node["retries"], 5);
     gtk::prelude::WidgetExt::activate_action(
         &window,
         "win.node-jq",
@@ -74,10 +115,11 @@ pub fn run(app: &adw::Application) {
     let source = find::<sourceview5::View>(&widget, None).unwrap();
     let buffer = source.buffer();
     let text = buffer.text(&buffer.start_iter(), &buffer.end_iter(), true);
-    let value: serde_json::Value = serde_json::from_str(&text).unwrap();
-    assert_eq!(value.as_array().unwrap().len(), 3);
-    assert_eq!(value[1]["spec"]["ports"][0]["port"], 8080);
-    assert!(value[2].is_null());
+    assert_eq!(
+        text.as_str(),
+        std::fs::read_to_string(examples.join("resources.yml")).unwrap()
+    );
+    assert_eq!(text.matches("---").count(), 3);
     stream.close();
 
     // Parser diagnostics reach the native alert without showing a partial tree.

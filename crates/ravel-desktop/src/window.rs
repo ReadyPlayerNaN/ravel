@@ -6,6 +6,7 @@ use std::{
 
 use gtk::{gio, glib};
 use libadwaita::{self as adw, prelude::*};
+use sourceview5::prelude::BufferExt;
 
 use ravel_core::{Document, Format};
 
@@ -17,7 +18,8 @@ struct Viewer {
     hover: Rc<crate::key_hover::KeyHover>,
     structured: Rc<crate::structured::Structured>,
     raw_page: adw::ViewStackPage,
-    _folding: Rc<crate::folding::Folding>,
+    folding: Rc<crate::folding::Folding>,
+    copy: gtk::Button,
     pointer: gtk::Label,
     status: gtk::Label,
     spinner: gtk::Spinner,
@@ -142,7 +144,8 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
         hover,
         structured,
         raw_page,
-        _folding: folding,
+        folding,
+        copy: copy.clone(),
         pointer,
         status,
         spinner,
@@ -313,11 +316,30 @@ impl Viewer {
         let Some(value) = document.value_at("") else {
             return;
         };
-        match serde_json::to_string_pretty(value) {
-            Ok(text) => self.hover.set_content(value, "", &text),
-            Err(error) => {
-                self.show_error(&error.to_string());
-                return;
+        let is_yaml = document.format() == Format::Yaml;
+        if let Ok(buffer) = self.text.buffer().downcast::<sourceview5::Buffer>() {
+            buffer.set_language(
+                sourceview5::LanguageManager::default()
+                    .language(if is_yaml { "yaml" } else { "json" })
+                    .as_ref(),
+            );
+        }
+        self.folding.set_enabled(!is_yaml);
+        self.copy.set_tooltip_text(Some(if is_yaml {
+            "Copy YAML source"
+        } else {
+            "Copy JSON"
+        }));
+        if let Some(source) = document.yaml_source() {
+            // Changing the buffer clears the JSON-only hover index.
+            self.text.buffer().set_text(source);
+        } else {
+            match serde_json::to_string_pretty(value) {
+                Ok(text) => self.hover.set_content(value, "", &text),
+                Err(error) => {
+                    self.show_error(&error.to_string());
+                    return;
+                }
             }
         }
         self.structured.set_content(document, "");
@@ -327,7 +349,7 @@ impl Viewer {
             Format::Json => "JSON".to_owned(),
             Format::JsonLines => format!("JSON Lines · {} records", document.document_count()),
             Format::Yaml => format!(
-                "YAML · {} {} · Normalized to JSON",
+                "YAML · {} {}",
                 document.document_count(),
                 if document.document_count() == 1 {
                     "document"
@@ -338,7 +360,7 @@ impl Viewer {
         };
         self.raw_page
             .set_title(Some(if document.format() == Format::Yaml {
-                "Raw (JSON)"
+                "Raw YAML"
             } else {
                 "Raw"
             }));

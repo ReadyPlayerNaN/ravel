@@ -1,7 +1,8 @@
 //! GTK-independent parsing and structural search for JSON and YAML documents.
 //!
 //! YAML is normalized to JSON-compatible values. Multi-document YAML streams
-//! become synthetic arrays; comments, source formatting and tags are not retained.
+//! become synthetic arrays. Original YAML source is retained separately for raw
+//! display; parsed values do not retain comments, source formatting or tags.
 //!
 //! JSON Lines is represented as a synthetic array. Paths are RFC 6901 JSON
 //! Pointers into that array (record indices, not physical line numbers).
@@ -213,6 +214,7 @@ pub struct Document {
     root: Arc<Node>,
     format: Format,
     document_count: usize,
+    yaml_source: Option<String>,
 }
 
 impl Document {
@@ -253,7 +255,18 @@ impl Document {
             root,
             format,
             document_count,
+            yaml_source: if format == Format::Yaml {
+                Some(std::str::from_utf8(bytes)?.to_owned())
+            } else {
+                None
+            },
         })
+    }
+
+    /// Original YAML source, preserving comments, layout and document separators.
+    /// A leading UTF-8 BOM is stripped. Other formats use generated JSON previews.
+    pub fn yaml_source(&self) -> Option<&str> {
+        self.yaml_source.as_deref()
     }
 
     /// Number of source documents: one for JSON, nonblank records for JSON Lines,

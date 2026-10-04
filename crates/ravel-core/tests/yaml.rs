@@ -143,6 +143,20 @@ fn yaml_rejects_excessive_nesting_before_building_the_tree() {
 }
 
 #[test]
+fn yaml_retains_original_source_for_raw_display() {
+    let source = "# comment\r\nbase: &base {name: Alice}\r\ncopy: *base\r\n---\r\nnull\r\n";
+    let document = Document::parse(source.as_bytes(), Format::Yaml).unwrap();
+    assert_eq!(document.yaml_source(), Some(source));
+    assert_eq!(document.document_count(), 2);
+    assert!(
+        Document::parse(b"{}", Format::Json)
+            .unwrap()
+            .yaml_source()
+            .is_none()
+    );
+}
+
+#[test]
 fn yaml_syntax_errors_include_location() {
     let error = Document::parse(b"name: Alice\nitems: [1, 2\n", Format::Yaml)
         .unwrap_err()

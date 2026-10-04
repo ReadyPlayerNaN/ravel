@@ -11,9 +11,11 @@ without an explicit requirement.
   (`yaml.rs`, `yaml_value.rs`) normalizes to JSON-compatible values; streams with
   multiple documents become arrays. Preserve null stream slots, reject unsupported
   values without silent coercion, retain parser budgets, and never enable file
-  includes or external resource loading. Raw and jq consume normalized JSON.
+  includes or external resource loading. Structured and jq consume normalized JSON;
+  Raw YAML uses retained original source (comments, anchors, layout and separators).
+  JSON-only hover indexing and delimiter folding must not run on YAML source.
 - `crates/ravel-desktop`: native UI, file opening, application actions, and errors.
-  `preview.rs` configures the read-only GtkSourceView JSON preview and binds its
+  `preview.rs` configures the read-only GtkSourceView preview and binds its
   color scheme to Libadwaita's light/dark theme. `key_index.rs` indexes rendered
   keys and their array-wildcard structural paths; `key_hover.rs` handles pointer,
   Shift, and viewport highlighting. `fold_index.rs` indexes container body lines;
