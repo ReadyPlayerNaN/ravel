@@ -53,7 +53,7 @@ jobs:
     steps:
       - name: Install packaging tools
         run: |
-          pacman -Syu --noconfirm --needed git rust shellcheck desktop-file-utils
+          pacman -Syu --noconfirm --needed git rust shellcheck actionlint openssh desktop-file-utils
           useradd --create-home builder
           echo 'builder ALL=(ALL) NOPASSWD: /usr/bin/pacman' > /etc/sudoers.d/builder
           chmod 440 /etc/sudoers.d/builder
@@ -61,6 +61,11 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Check publishing automation without AUR credentials
+        run: |
+          actionlint
+          shellcheck scripts/ci/*.sh
+          bash scripts/ci/test-publish-aur.sh
       - name: Build and check the tested commit as an Arch package
         run: |
           chown -R builder:builder "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
@@ -72,3 +77,36 @@ jobs:
           path: ${{ runner.temp }}/ravel-package/*.pkg.tar.zst
           if-no-files-found: error
           retention-days: 7
+
+  publish-aur:
+    needs: [rust, arch-package]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && github.repository == 'ReadyPlayerNaN/ravel'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: aur
+    concurrency:
+      group: aur-ravel-git
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Skip superseded master builds
+        id: current
+        shell: bash
+        run: |
+          set -euo pipefail
+          current=$(git ls-remote origin refs/heads/master | cut -f1)
+          if [[ "$current" == "$GITHUB_SHA" ]]; then
+            echo 'publish=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'A newer master commit exists; skipping this publication.'
+          fi
+      - name: Publish the validated AUR recipe
+        if: steps.current.outputs.publish == 'true'
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          AUR_COMMIT_NAME: ${{ vars.AUR_COMMIT_NAME }}
+          AUR_COMMIT_EMAIL: ${{ vars.AUR_COMMIT_EMAIL }}
+        run: bash scripts/ci/publish-aur.sh
