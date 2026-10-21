@@ -52,7 +52,8 @@ One-time setup by the repository/AUR owner:
    account must be allowed to create `ravel-git`, or maintain/co-maintain it if it
    already exists. A dedicated key can be revoked independently of your other keys.
 2. In GitHub **Settings → Environments**, create an environment named **`aur`**.
-   Restrict its deployment branches to `master`. Configure:
+   Allow the `master` branch and `v*` tags (for [`ravel-bin`](../aur-bin/README.md)
+   releases) in its deployment branch/tag rules. Configure:
    - Secret **`AUR_SSH_PRIVATE_KEY`**: the complete private key, including its
      header/footer and newlines.
    - Variable **`AUR_COMMIT_NAME`**: the Git author name for AUR commits.
@@ -69,6 +70,9 @@ Ed25519 host key (`known_hosts`), verified against the fingerprint published on
 <https://aur.archlinux.org/>; a host-key rotation requires a reviewed update.
 Its temporary private key is removed on exit. There is no third-party publishing
 action, and no package-provided build code runs in the secret-bearing job.
+
+This section describes `ravel-git`; [tagged binary releases](../aur-bin/README.md)
+use the same credentials to publish the separate `ravel-bin` package.
 
 Only the reviewed `PKGBUILD` and `.SRCINFO` are pushed to the AUR. Unchanged recipes
 are a no-op, even when upstream code changed; the Arch binaries are GitHub Actions

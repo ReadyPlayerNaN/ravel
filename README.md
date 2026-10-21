@@ -64,9 +64,12 @@ older releases such as Ubuntu 24.04 ship an insufficient Libadwaita version.
 
 ## Arch Linux package
 
-The [`ravel-git` package recipe](packaging/aur/README.md) builds from `master`
-and installs the desktop entry and release binary. See its documentation for
-local builds and AUR maintenance.
+- [`ravel-git`](packaging/aur/README.md) builds the latest `master` from source.
+- [`ravel-bin`](packaging/aur-bin/README.md) installs prebuilt x86-64 binaries from
+  tagged GitHub releases, without requiring Rust or Cargo.
+
+Both install the `ravel` executable and desktop entry; choose one, since they
+conflict. See the package documentation for publishing setup and local builds.
 
 ## Run
 

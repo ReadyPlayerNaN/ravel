@@ -7,6 +7,7 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 chmod 755 "$work"
 export GITHUB_WORKSPACE="$work/checkout" RUNNER_TEMP="$work/runner-temp"
+export RELEASE_TAG=v1.2.3
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_ALLOW_PROTOCOL=file
 mkdir -p "$GITHUB_WORKSPACE/scripts/ci" "$RUNNER_TEMP/_github_workflow"
 printf '{}\n' > "$RUNNER_TEMP/_github_workflow/event.json"
@@ -21,6 +22,7 @@ cat > "$GITHUB_WORKSPACE/scripts/ci/build-arch-package.sh" <<'BUILD'
 set -euo pipefail
 test "$(id -un)" = builder
 test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+test "$RELEASE_TAG" = v1.2.3
 printf 'package\n' > "$1/ravel-git.pkg.tar.zst"
 BUILD
 git -C "$GITHUB_WORKSPACE" -c init.defaultBranch=master init

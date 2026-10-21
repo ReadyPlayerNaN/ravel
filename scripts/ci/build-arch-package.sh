@@ -38,3 +38,13 @@ if grep -F 'not found' linked-libraries.txt; then
     echo 'Packaged binary has unresolved native libraries' >&2
     exit 1
 fi
+
+# Exercise the binary recipe on branch/PR builds too, without retaining or
+# publishing a pretend release. Real tag builds keep their release artifact.
+release_output="$work/release-smoke"
+if [[ -n ${RELEASE_TAG:-} ]]; then
+    release_output="$output/release"
+fi
+SOURCE_DATE_EPOCH=$(git -C "$repo" show -s --format=%ct "$revision")
+export SOURCE_DATE_EPOCH
+bash "$repo/scripts/ci/prepare-release.sh" "$package" "$release_output" "${RELEASE_TAG:-v0.0.0}"

@@ -21,6 +21,6 @@ trap cleanup EXIT
 git clone --no-hardlinks -- "$GITHUB_WORKSPACE" "$build/source"
 git -C "$build/source" checkout --detach "$GITHUB_SHA"
 chown -R builder:builder "$build" "$output"
-sudo -u builder --preserve-env=GITHUB_SHA,CARGO_BUILD_JOBS \
+sudo -u builder --preserve-env=GITHUB_SHA,CARGO_BUILD_JOBS,RELEASE_TAG \
     bash -ec 'cd "$1"; exec bash scripts/ci/build-arch-package.sh "$2"' \
     _ "$build/source" "$output"
