@@ -3,7 +3,10 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::ops::Range;
 
-use pulldown_cmark::{Alignment, CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
+use linkify::{LinkFinder, LinkKind};
+use pulldown_cmark::{
+    Alignment, CodeBlockKind, Event, Options, Parser, Tag, TagEnd, TextMergeStream,
+};
 
 use super::{MAX_EVENTS, MAX_NESTING, MAX_RENDERED_BYTES, MarkdownError};
 
@@ -29,6 +32,9 @@ pub(super) fn render(source: &str) -> Result<(String, Vec<String>)> {
         }
         events.push(event);
     }
+    // Entities and escaped punctuation can split a URL across adjacent text
+    // events. Merge only after enforcing the original parser-event budget.
+    let events: Vec<_> = TextMergeStream::new(events.into_iter()).collect();
     let mut renderer = Renderer::new(&events);
     renderer.events(&events)?;
     renderer.footnotes(&events)?;
@@ -122,6 +128,8 @@ struct Renderer {
     notes: HashMap<String, Note>,
     note_order: Vec<String>,
     links: Vec<bool>,
+    link_finder: LinkFinder,
+    in_code_block: bool,
     table_alignments: Vec<Alignment>,
     table_head: bool,
     table_column: usize,
@@ -130,6 +138,10 @@ struct Renderer {
 impl Renderer {
     fn new(events: &[Event<'_>]) -> Self {
         let mut renderer = Self::default();
+        renderer
+            .link_finder
+            .kinds(&[LinkKind::Url])
+            .url_must_have_scheme(false);
         for event in events {
             if let Event::FootnoteReference(label) = event {
                 let number = renderer.notes.len() + 1;
@@ -228,7 +240,8 @@ impl Renderer {
                 }
                 Event::Start(tag) => self.start(tag),
                 Event::End(tag) => self.end(*tag),
-                Event::Text(text) | Event::Html(text) => self.output.push_str(&escape(text)),
+                Event::Text(text) => self.text(text)?,
+                Event::Html(text) => self.output.push_str(&escape(text)),
                 Event::Code(text) | Event::InlineHtml(text) => {
                     self.output.push_str(&format!("<code>{}</code>", escape(text)));
                 }
@@ -263,11 +276,46 @@ impl Renderer {
         Ok(())
     }
 
+    fn text(&mut self, text: &str) -> Result<()> {
+        if self.in_code_block || !self.links.is_empty() {
+            self.output.push_str(&escape(text));
+            return check_size(&self.output);
+        }
+        let mut end = 0;
+        for link in self.link_finder.links(text) {
+            let url = link.as_str();
+            let prefix = if url.get(..4).is_some_and(|s| s.eq_ignore_ascii_case("www.")) {
+                "https://"
+            } else if url.split_once("://").is_some_and(|(scheme, _)| {
+                scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https")
+            }) {
+                ""
+            } else {
+                continue;
+            };
+            let destination = format!("{prefix}{url}");
+            if !allowed_destination(&destination, false) {
+                continue;
+            }
+            self.output.push_str(&escape(&text[end..link.start()]));
+            self.output.push_str(&format!(
+                "<a href=\"{}\" rel=\"noreferrer noopener\">{}</a>",
+                escape(&destination),
+                escape(url)
+            ));
+            check_size(&self.output)?;
+            end = link.end();
+        }
+        self.output.push_str(&escape(&text[end..]));
+        check_size(&self.output)
+    }
+
     fn start(&mut self, tag: &Tag<'_>) {
         match tag {
             Tag::Paragraph => self.output.push_str("<p>"),
             Tag::BlockQuote(_) => self.output.push_str("<blockquote>"),
             Tag::CodeBlock(kind) => {
+                self.in_code_block = true;
                 self.output.push_str("<pre><code");
                 if let CodeBlockKind::Fenced(language) = kind {
                     self.output
@@ -335,7 +383,10 @@ impl Renderer {
                 return;
             }
             TagEnd::BlockQuote(_) => "</blockquote>\n",
-            TagEnd::CodeBlock => "</code></pre>\n",
+            TagEnd::CodeBlock => {
+                self.in_code_block = false;
+                "</code></pre>\n"
+            }
             TagEnd::HtmlBlock => "</pre>\n",
             TagEnd::List(true) => "</ol>\n",
             TagEnd::List(false) => "</ul>\n",

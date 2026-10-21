@@ -210,7 +210,9 @@ the application's light/dark theme.
 ### Links, headings and footnotes
 
 Normal, reference-style and autolink hyperlinks are clickable and keyboard
-focusable. HTTP(S) and email links open in the system browser/mail application;
+focusable. Bare `http://`, `https://` and `www.` URLs in prose also become links
+(`www.` uses HTTPS); code, literal HTML and existing link labels are left alone.
+HTTP(S) and email links open in the system browser/mail application;
 local file links use an application chooser rather than silently launching files.
 Relative destinations resolve against the Markdown file, not the working directory.
 Active or unsupported schemes such as `javascript:` are not clickable.

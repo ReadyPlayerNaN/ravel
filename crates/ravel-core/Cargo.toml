@@ -10,6 +10,7 @@ serde-saphyr.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 pulldown-cmark.workspace = true
+linkify.workspace = true
 
 [lints]
 workspace = true

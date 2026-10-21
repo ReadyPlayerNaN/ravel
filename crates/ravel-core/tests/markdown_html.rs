@@ -20,6 +20,61 @@ fn links_are_clickable_but_active_schemes_are_blocked() {
 }
 
 #[test]
+fn bare_web_urls_are_linked_without_surrounding_punctuation() {
+    let html = render(
+        "See https://example.org/a_(b). Then (http://example.org/path), www.example.org and HTTPS://example.org/日本語!",
+    );
+    for url in [
+        "https://example.org/a_(b)",
+        "http://example.org/path",
+        "https://www.example.org",
+        "HTTPS://example.org/日本語",
+    ] {
+        assert!(html.contains(&format!("href=\"{url}\"")), "{html}");
+    }
+    assert!(html.contains("a_(b)</a>. Then ("), "{html}");
+    assert!(html.contains("/path</a>),"), "{html}");
+    assert!(html.contains(">www.example.org</a>"), "{html}");
+}
+
+#[test]
+fn bare_url_entities_are_merged_and_escaped_without_changing_source() {
+    let source = "https://example.org/?a=1&amp;b=2 and https://example.org/\\\"quoted";
+    let document = Markdown::parse(source.as_bytes()).unwrap();
+    assert!(
+        document
+            .html()
+            .contains("href=\"https://example.org/?a=1&amp;b=2\""),
+        "{}",
+        document.html()
+    );
+    assert!(
+        !document
+            .html()
+            .contains("href=\"https://example.org/\"quoted")
+    );
+    assert_eq!(document.source(), source);
+}
+
+#[test]
+fn bare_urls_leave_code_html_math_images_and_existing_links_alone() {
+    let html = render(
+        "`https://inline.example.org`\n\n```\nhttps://fenced.example.org\n```\n\n    https://indented.example.org\n\n<div>https://html.example.org</div>\n\n<span title=\"https://attribute.example.org\">literal</span>\n\n$https://math.example.org$\n\n![https://alt.example.org](image.png)\n\n[https://label.example.org](https://destination.example.org)\n\n[https://blocked.example.org](javascript:evil)\n\n<https://autolink.example.org>",
+    );
+    assert_eq!(html.matches("<a ").count(), 2, "{html}");
+    assert!(html.contains("href=\"https://destination.example.org\""));
+    assert!(html.contains("href=\"https://autolink.example.org\""));
+}
+
+#[test]
+fn bare_urls_do_not_enable_unsupported_schemes_or_guess_domains() {
+    let html = render(
+        "javascript:alert(1) javascript://example.org ftp://example.org data:text/html,evil file:///tmp/file example.org sample.md",
+    );
+    assert!(!html.contains("<a "), "{html}");
+}
+
+#[test]
 fn headings_have_unique_unicode_slugs_explicit_ids_and_a_contents_index() {
     let html = render(
         "# Hello, *world*!\n## Hello, world!\n# Hello world-1\n# 日本語\n# Named {#custom .ignored onclick=evil}\n# Explicit again {#custom}\n",

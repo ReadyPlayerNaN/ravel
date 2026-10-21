@@ -20,6 +20,7 @@ thiserror = "2.0"
 serde-saphyr = { version = "1.3", default-features = false, features = ["deserialize"] }
 serde = "1.0"
 pulldown-cmark = { version = "0.13", default-features = false }
+linkify = "0.11"
 ravel-core = { path = "crates/ravel-core" }
 
 [workspace.lints.rust]
