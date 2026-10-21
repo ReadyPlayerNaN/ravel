@@ -3,3 +3,5 @@
 include!("window.rs");
 #[path = "markdown_tests.rs"]
 pub(crate) mod markdown_tests;
+#[path = "open_tests.rs"]
+pub(crate) mod open_tests;

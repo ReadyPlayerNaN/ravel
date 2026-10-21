@@ -60,6 +60,7 @@ pub(crate) fn run() {
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
+    crate::window::open_tests::run(&app);
     let samples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
     let window =
         crate::window::create(&app, Some(gio::File::for_path(samples.join("sample.json"))));

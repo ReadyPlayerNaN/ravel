@@ -5,8 +5,8 @@ Supports JSON, JSON Lines, YAML and formatted Markdown.
 
 ## Initial interface
 
-- Open `.json`, `.jsonl`, `.yaml`, `.yml`, `.md` and `.markdown` documents from the native chooser
-  or command line (extensions are case-insensitive).
+- Open `.json`, `.jsonl`, `.yaml`, `.yml`, `.md` and `.markdown` documents from the native chooser,
+  the searchable **Open ▾** recent-documents menu, or command line (extensions are case-insensitive).
 - Explore nested objects and arrays in a full-width document view, without a
   separate navigation sidebar. The former sidebar search/type controls are removed.
 - Read document statistics in the footer: value and type counts, object keys,
@@ -83,7 +83,23 @@ cargo run --locked -- examples/sample.md
 ```
 
 Multiple command-line files open in separate windows. Opening from a window's
-chooser replaces its current document only after a successful parse.
+chooser or recent-documents menu replaces its current document only after a successful parse.
+
+The **Open ▾** menu shows recent local documents, newest first, with filenames and
+parent directories. Search matches filenames and paths case-insensitively. Enter
+opens the first match; Down enters the list, Up from its first row returns to
+search, and Escape closes the menu. The folder button (or Ctrl+O) opens the native
+file chooser. **×** forgets an entry without deleting or changing the document.
+Missing files report the normal open error and can be removed from the list.
+
+Recent-document history is application **state**, stored in
+`$XDG_STATE_HOME/global.zak.ravel/recent-files.json`, falling back to
+`~/.local/state/global.zak.ravel/recent-files.json` when `XDG_STATE_HOME` is unset,
+empty, or relative. It is not written into XDG config or cache directories.
+Only successfully opened local file URIs are remembered (at most 100); no document
+contents or remote URLs are stored. State writes run off the UI thread and use
+atomic replacement with private file permissions. Storage errors are logged and
+do not prevent viewing. Delete this file while Ravel is closed to clear history.
 
 | Shortcut | Action |
 | --- | --- |

@@ -44,6 +44,7 @@ struct Viewer {
     document: RefCell<Option<OpenDocument>>,
     source_file: RefCell<Option<gio::File>>,
     generation: Cell<u64>,
+    history: Rc<crate::recent::History>,
 }
 
 pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::ApplicationWindow {
@@ -66,11 +67,8 @@ fn build(app: &adw::Application) -> (adw::ApplicationWindow, Rc<Viewer>) {
     let header = adw::HeaderBar::new();
     let title = adw::WindowTitle::new("Ravel", "JSON, YAML and Markdown viewer");
     header.set_title_widget(Some(&title));
-    let open = gtk::Button::builder()
-        .label("Open…")
-        .action_name("win.open")
-        .tooltip_text("Open a JSON, YAML or Markdown document (Ctrl+O)")
-        .build();
+    let history = crate::recent::History::shared(app);
+    let open = crate::open_popover::create(&history);
     header.pack_start(&open);
     let spinner = gtk::Spinner::new();
     header.pack_end(&spinner);
@@ -192,6 +190,7 @@ fn build(app: &adw::Application) -> (adw::ApplicationWindow, Rc<Viewer>) {
         document: RefCell::new(None),
         source_file: RefCell::new(None),
         generation: Cell::new(0),
+        history,
     });
     let open_action = gio::SimpleAction::new("open", None);
     open_action.connect_activate(glib::clone!(
@@ -200,6 +199,17 @@ fn build(app: &adw::Application) -> (adw::ApplicationWindow, Rc<Viewer>) {
         move |_, _| viewer.choose_file()
     ));
     window.add_action(&open_action);
+    let open_recent = gio::SimpleAction::new("open-recent", Some(glib::VariantTy::STRING));
+    open_recent.connect_activate(glib::clone!(
+        #[weak]
+        viewer,
+        move |_, target| {
+            if let Some(uri) = target.and_then(|value| value.str()) {
+                viewer.load(gio::File::for_uri(uri));
+            }
+        }
+    ));
+    window.add_action(&open_recent);
     let node_copy = gio::SimpleAction::new("node-copy", Some(glib::VariantTy::STRING));
     node_copy.connect_activate(glib::clone!(
         #[weak]
@@ -338,6 +348,7 @@ impl Viewer {
                 match result {
                     Ok(document) => {
                         *viewer.document.borrow_mut() = Some(document);
+                        viewer.history.record(&file);
                         *viewer.source_file.borrow_mut() = Some(file);
                         viewer.title.set_title(&name);
                         viewer.title.set_subtitle("Ravel · Read only");

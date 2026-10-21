@@ -26,7 +26,12 @@ fn main() -> glib::ExitCode {
     quit.connect_activate(glib::clone!(
         #[weak]
         app,
-        move |_, _| app.quit()
+        move |_, _| {
+            // Let pending history writes finish under their application holds.
+            for window in app.windows() {
+                window.close();
+            }
+        }
     ));
     app.add_action(&quit);
     app.set_accels_for_action("win.open", &["<Control>o"]);
