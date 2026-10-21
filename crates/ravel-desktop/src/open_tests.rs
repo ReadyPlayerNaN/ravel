@@ -161,6 +161,10 @@ pub(crate) fn run(app: &adw::Application) {
     }
     search.set_text("does not exist");
     assert!(list.row_at_index(0).is_none());
+    let empty = find::<gtk::Box>(list.upcast_ref(), Some("recent-empty")).unwrap();
+    let empty_title = find::<gtk::Label>(empty.upcast_ref(), None).unwrap();
+    assert_eq!(empty_title.text(), "No matching documents");
+    wait_for(|| empty.is_mapped());
     search.emit_by_name::<()>("activate", &[]);
     assert_eq!(opened.borrow().len(), 1);
     assert!(popover.is_visible());
@@ -200,7 +204,32 @@ pub(crate) fn run(app: &adw::Application) {
     menu.popup();
     wait_for(|| popover.is_mapped());
     assert!(list.row_at_index(0).is_none());
-    assert!(find::<gtk::Label>(list.upcast_ref(), None).is_some());
+    wait_for(|| empty.is_mapped());
+    assert_eq!(empty_title.text(), "No recent documents");
+    assert!(empty_title.has_css_class("title-2"));
+    assert!(empty.has_css_class("dim-label"));
+    let icon = find::<gtk::Image>(empty.upcast_ref(), None).unwrap();
+    assert_eq!(
+        icon.icon_name().as_deref(),
+        Some("document-open-recent-symbolic")
+    );
+    assert_eq!(icon.pixel_size(), 96);
+    assert_eq!(icon.halign(), gtk::Align::Center);
+    assert_eq!(empty.spacing(), 32);
+    assert_eq!(empty.margin_top(), 32);
+    assert_eq!(empty.margin_bottom(), 32);
+    assert!(search.is_sensitive());
+    assert!(
+        find::<gtk::Button>(popover.upcast_ref(), Some("recent-browse"))
+            .unwrap()
+            .is_sensitive()
+    );
+    history.record(&first);
+    wait_for(|| !empty.is_mapped());
+    assert!(list.row_at_index(0).is_some());
+    history.remove(&first);
+    wait_for(|| empty.is_mapped());
+    wait_for(|| fs::read(&path).ok().as_deref() == Some(b"[]"));
     menu.popdown();
     window.close();
     drop(history);

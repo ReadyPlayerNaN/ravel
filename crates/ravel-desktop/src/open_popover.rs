@@ -57,12 +57,27 @@ pub(crate) fn create(history: &Rc<History>) -> gtk::MenuButton {
         .css_classes(["navigation-sidebar"])
         .build();
     list.set_widget_name("recent-list");
-    let empty = gtk::Label::builder()
-        .label("No recent documents")
-        .margin_top(24)
-        .margin_bottom(24)
+    let empty = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(32)
+        .margin_top(32)
+        .margin_bottom(32)
         .css_classes(["dim-label"])
         .build();
+    empty.set_widget_name("recent-empty");
+    let empty_icon = gtk::Image::builder()
+        .icon_name("document-open-recent-symbolic")
+        .pixel_size(96)
+        .halign(gtk::Align::Center)
+        .build();
+    let empty_title = gtk::Label::builder()
+        .label("No recent documents")
+        .justify(gtk::Justification::Center)
+        .wrap(true)
+        .css_classes(["title-2"])
+        .build();
+    empty.append(&empty_icon);
+    empty.append(&empty_title);
     list.set_placeholder(Some(&empty));
     list.bind_model(Some(&filtered), glib::clone!(
         #[weak]
@@ -144,9 +159,9 @@ pub(crate) fn create(history: &Rc<History>) -> gtk::MenuButton {
         #[weak]
         filter,
         #[weak]
-        empty,
+        empty_title,
         move |search| {
-            empty.set_label(if search.text().trim().is_empty() {
+            empty_title.set_label(if search.text().trim().is_empty() {
                 "No recent documents"
             } else {
                 "No matching documents"
