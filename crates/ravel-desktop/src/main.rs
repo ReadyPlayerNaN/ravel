@@ -3,6 +3,7 @@ mod folding;
 mod jq;
 mod key_hover;
 mod key_index;
+mod markdown_view;
 mod preview;
 mod structured;
 mod syntax_label;

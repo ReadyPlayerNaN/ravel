@@ -8,7 +8,25 @@ use gtk::{gio, glib};
 use libadwaita::{self as adw, prelude::*};
 use sourceview5::prelude::BufferExt;
 
-use ravel_core::{Document, Format};
+use ravel_core::{Document, Format, markdown::Markdown};
+
+#[cfg(test)]
+#[path = "markdown_tests.rs"]
+pub(crate) mod markdown_tests;
+
+enum OpenDocument {
+    Structured(Arc<Document>),
+    Markdown(Markdown),
+}
+
+impl OpenDocument {
+    fn structured(&self) -> Option<&Arc<Document>> {
+        match self {
+            Self::Structured(document) => Some(document),
+            Self::Markdown(_) => None,
+        }
+    }
+}
 
 struct Viewer {
     window: glib::WeakRef<adw::ApplicationWindow>,
@@ -17,17 +35,30 @@ struct Viewer {
     text: sourceview5::View,
     hover: Rc<crate::key_hover::KeyHover>,
     structured: Rc<crate::structured::Structured>,
+    view_stack: adw::ViewStack,
+    structured_page: adw::ViewStackPage,
+    markdown_page: adw::ViewStackPage,
+    markdown: gtk::TextView,
     raw_page: adw::ViewStackPage,
     folding: Rc<crate::folding::Folding>,
     copy: gtk::Button,
     pointer: gtk::Label,
     status: gtk::Label,
     spinner: gtk::Spinner,
-    document: RefCell<Option<Arc<Document>>>,
+    document: RefCell<Option<OpenDocument>>,
     generation: Cell<u64>,
 }
 
 pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::ApplicationWindow {
+    let (window, viewer) = build(app);
+    window.present();
+    if let Some(file) = file {
+        viewer.load(file);
+    }
+    window
+}
+
+fn build(app: &adw::Application) -> (adw::ApplicationWindow, Rc<Viewer>) {
     let window = adw::ApplicationWindow::builder()
         .application(app)
         .title("Ravel")
@@ -36,12 +67,12 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
         .build();
     let toolbar = adw::ToolbarView::new();
     let header = adw::HeaderBar::new();
-    let title = adw::WindowTitle::new("Ravel", "JSON and YAML document viewer");
+    let title = adw::WindowTitle::new("Ravel", "JSON, YAML and Markdown viewer");
     header.set_title_widget(Some(&title));
     let open = gtk::Button::builder()
         .label("Open…")
         .action_name("win.open")
-        .tooltip_text("Open a JSON or YAML document (Ctrl+O)")
+        .tooltip_text("Open a JSON, YAML or Markdown document (Ctrl+O)")
         .build();
     header.pack_start(&open);
     let spinner = gtk::Spinner::new();
@@ -52,7 +83,7 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
     let empty = adw::StatusPage::builder()
         .icon_name("text-x-generic-symbolic")
         .title("Untangle your data")
-        .description("Open a .json, .jsonl, .yaml or .yml file to explore its structure.")
+        .description("Open a JSON, YAML or Markdown file to read and explore.")
         .build();
     let empty_open = gtk::Button::builder()
         .label("Open Document…")
@@ -92,12 +123,25 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
         .build();
     let view_stack = adw::ViewStack::new();
     view_stack.set_widget_name("view-stack");
-    view_stack.add_titled_with_icon(
+    let structured_page = view_stack.add_titled_with_icon(
         &structured_widget,
         Some("structured"),
         "Structured",
         "view-list-symbolic",
     );
+    let markdown = crate::markdown_view::create();
+    let markdown_scroll = gtk::ScrolledWindow::builder()
+        .child(&markdown)
+        .vexpand(true)
+        .hexpand(true)
+        .build();
+    let markdown_page = view_stack.add_titled_with_icon(
+        &markdown_scroll,
+        Some("formatted"),
+        "Formatted",
+        "text-x-generic-symbolic",
+    );
+    markdown_page.set_visible(false);
     let raw_page = view_stack.add_titled_with_icon(
         &detail_scroll,
         Some("raw"),
@@ -143,6 +187,10 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
         text,
         hover,
         structured,
+        view_stack,
+        structured_page,
+        markdown_page,
+        markdown,
         raw_page,
         folding,
         copy: copy.clone(),
@@ -218,11 +266,7 @@ pub fn create(app: &adw::Application, file: Option<gio::File>) -> adw::Applicati
             let _ = &viewer;
         }
     });
-    window.present();
-    if let Some(file) = file {
-        viewer.load(file);
-    }
-    window
+    (window, viewer)
 }
 
 impl Viewer {
@@ -231,8 +275,8 @@ impl Viewer {
             return;
         };
         let filter = gtk::FileFilter::new();
-        filter.set_name(Some("JSON and YAML documents"));
-        for suffix in ["json", "jsonl", "yaml", "yml"] {
+        filter.set_name(Some("JSON, YAML and Markdown documents"));
+        for suffix in ["json", "jsonl", "yaml", "yml", "md", "markdown"] {
             filter.add_suffix(suffix);
         }
         let all = gtk::FileFilter::new();
@@ -270,6 +314,7 @@ impl Viewer {
             .map(|path| path.to_string_lossy().into_owned())
             .unwrap_or_else(|| file.uri().into());
         let format = Format::from_filename(&name);
+        let is_markdown = Markdown::matches_filename(&name);
         glib::spawn_future_local(glib::clone!(
             #[weak(rename_to = viewer)]
             self,
@@ -279,10 +324,19 @@ impl Viewer {
                         .load_contents_future()
                         .await
                         .map_err(|error| error.to_string())?;
-                    gio::spawn_blocking(move || Document::parse(&bytes, format))
-                        .await
-                        .map_err(|_| "Document parsing worker failed".to_owned())?
-                        .map_err(|error| error.to_string())
+                    gio::spawn_blocking(move || {
+                        if is_markdown {
+                            Markdown::parse(&bytes)
+                                .map(OpenDocument::Markdown)
+                                .map_err(|error| error.to_string())
+                        } else {
+                            Document::parse(&bytes, format)
+                                .map(|document| OpenDocument::Structured(Arc::new(document)))
+                                .map_err(|error| error.to_string())
+                        }
+                    })
+                    .await
+                    .map_err(|_| "Document parsing worker failed".to_owned())?
                 }
                 .await;
                 // An older asynchronous open must not replace a newer document.
@@ -292,7 +346,7 @@ impl Viewer {
                 viewer.spinner.stop();
                 match result {
                     Ok(document) => {
-                        *viewer.document.borrow_mut() = Some(Arc::new(document));
+                        *viewer.document.borrow_mut() = Some(document);
                         viewer.title.set_title(&name);
                         viewer.title.set_subtitle("Ravel · Read only");
                         if let Some(window) = viewer.window.upgrade() {
@@ -310,9 +364,63 @@ impl Viewer {
 
     fn show_document(&self) {
         let document = self.document.borrow();
-        let Some(document) = document.as_ref() else {
-            return;
-        };
+        match document.as_ref() {
+            Some(OpenDocument::Structured(document)) => self.show_structured(document),
+            Some(OpenDocument::Markdown(document)) => self.show_markdown(document),
+            None => {}
+        }
+    }
+
+    fn show_markdown(&self, document: &Markdown) {
+        self.structured.clear();
+        self.folding.set_enabled(false);
+        // Replacing source text clears the JSON-only hover index.
+        self.text.buffer().set_text(document.source());
+        if let Ok(buffer) = self.text.buffer().downcast::<sourceview5::Buffer>() {
+            buffer.set_language(
+                sourceview5::LanguageManager::default()
+                    .language("markdown")
+                    .as_ref(),
+            );
+        }
+        crate::markdown_view::set_content(&self.markdown, document);
+        self.raw_page.set_title(Some("Raw Markdown"));
+        self.copy.set_tooltip_text(Some("Copy Markdown source"));
+        self.copy.set_hexpand(true);
+        self.copy.set_halign(gtk::Align::End);
+        self.pointer.set_visible(false);
+        self.status
+            .set_text("Markdown · Read only · Links and images are not loaded");
+        self.markdown_page.set_visible(true);
+        self.structured_page.set_visible(false);
+        self.view_stack.set_visible_child_name("formatted");
+        self.set_node_actions_enabled(false);
+    }
+
+    fn set_node_actions_enabled(&self, enabled: bool) {
+        if let Some(window) = self.window.upgrade() {
+            for name in ["node-copy", "node-pointer", "node-jq"] {
+                if let Some(action) = window
+                    .lookup_action(name)
+                    .and_then(|action| action.downcast::<gio::SimpleAction>().ok())
+                {
+                    action.set_enabled(enabled);
+                }
+            }
+        }
+    }
+
+    fn show_structured(&self, document: &Arc<Document>) {
+        self.structured_page.set_visible(true);
+        if self.markdown_page.is_visible() {
+            self.view_stack.set_visible_child_name("structured");
+        }
+        self.markdown_page.set_visible(false);
+        // Keep an actual buffer: clearing it to None can race GTK's queued layout.
+        self.markdown.set_buffer(Some(&gtk::TextBuffer::new(None)));
+        self.pointer.set_visible(true);
+        self.copy.set_hexpand(false);
+        self.set_node_actions_enabled(true);
         let Some(value) = document.value_at("") else {
             return;
         };
@@ -379,6 +487,7 @@ impl Viewer {
         } else {
             document
                 .as_ref()
+                .and_then(OpenDocument::structured)
                 .and_then(|document| document.value_at(pointer))
                 .and_then(|value| serde_json::to_string_pretty(value).ok())
         };
@@ -394,6 +503,7 @@ impl Viewer {
         let document = self.document.borrow();
         let Some(value) = document
             .as_ref()
+            .and_then(OpenDocument::structured)
             .and_then(|document| document.value_at(pointer))
         else {
             return;

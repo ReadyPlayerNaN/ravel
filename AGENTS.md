@@ -1,7 +1,7 @@
 # Ravel
 
 Ravel is a read-only GTK4 + Libadwaita document viewer, initially for JSON and
-JSON Lines, and YAML. Keep the application simple; do not add editing or network services
+JSON Lines, YAML and formatted Markdown. Keep the application simple; do not add editing or network services
 without an explicit requirement.
 
 ## Architecture
@@ -14,13 +14,18 @@ without an explicit requirement.
   includes or external resource loading. Structured and jq consume normalized JSON;
   Raw YAML uses retained original source (comments, anchors, layout and separators).
   JSON-only hover indexing and delimiter folding must not run on YAML source.
+  `markdown.rs` parses Markdown separately from JSON trees into inert text and
+  semantic style ranges. Preserve source, UTF-8 validation and rendering budgets;
+  never execute HTML or resolve image/link resources.
 - `crates/ravel-desktop`: native UI, file opening, application actions, and errors.
   `preview.rs` configures the read-only GtkSourceView preview and binds its
   color scheme to Libadwaita's light/dark theme. `key_index.rs` indexes rendered
   keys and their array-wildcard structural paths; `key_hover.rs` handles pointer,
   Shift, and viewport highlighting. `fold_index.rs` indexes container body lines;
   `folding.rs` contributes gutter controls and non-destructive visibility tags.
-  Keep highlighting and folding in this layer; copied text includes hidden content.
+  `markdown_view.rs` renders Markdown with native read-only GTK text tags; Markdown
+  has no structural/jq actions or JSON hover/folding. Keep highlighting and folding
+  in this layer; copied text includes hidden content.
   Use the GLib main context for UI tasks and GIO's worker pool for parsing.
 - `examples`: small documents for manual and automated smoke tests.
 

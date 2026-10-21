@@ -1,11 +1,11 @@
 # Ravel
 
 A simple, read-only structured document viewer built with Rust, GTK4 and Libadwaita.
-Supports JSON, JSON Lines and YAML.
+Supports JSON, JSON Lines, YAML and formatted Markdown.
 
 ## Initial interface
 
-- Open `.json`, `.jsonl`, `.yaml` and `.yml` documents from the native chooser
+- Open `.json`, `.jsonl`, `.yaml`, `.yml`, `.md` and `.markdown` documents from the native chooser
   or command line (extensions are case-insensitive).
 - Explore nested objects and arrays in a full-width document view, without a
   separate navigation sidebar. The former sidebar search/type controls are removed.
@@ -13,7 +13,9 @@ Supports JSON, JSON Lines and YAML.
   maximum depth, JSON Lines record count, and YAML document count.
 - Switch between **Structured** (native GTK nodes with animated, lazy expansion)
   and **Raw** (JSON preview) or **Raw YAML** (original YAML source).
-  Structured is the default.
+  Structured is the default for JSON and YAML.
+- Read Markdown in **Formatted** by default, with headings, emphasis, lists,
+  quotes, code and tables, or switch to **Raw Markdown** for the original source.
 - Right-click any structured node to copy its JSON or JSON Pointer, or run common
   type-specific **jq** operations. Results open in a read-only, copyable dialog;
   the original document is never changed.
@@ -63,6 +65,7 @@ cargo run --locked -- examples/sample.json
 cargo run --locked -- examples/events.jsonl
 cargo run --locked -- examples/sample.yaml
 cargo run --locked -- examples/resources.yml
+cargo run --locked -- examples/sample.md
 ```
 
 Multiple command-line files open in separate windows. Opening from a window's
@@ -191,6 +194,34 @@ point values use finite IEEE-754 double precision. Parser budgets bound nesting,
 alias expansion, node count and document count. No `!include` or external resource
 loading is enabled. A failed parse leaves the previous document unchanged.
 
+## Markdown conventions
+
+`.md` and `.markdown` files (case-insensitive) open as formatted, selectable,
+read-only documents using native GTK text rendering, not a web browser.
+CommonMark headings, paragraphs, emphasis, bold, inline/fenced/indented code,
+ordered and unordered nested lists, block quotes and horizontal rules are supported,
+along with strikethrough, task lists and tables. Tables use aligned, left-aligned
+columns; Markdown column alignment hints are not applied. Code blocks preserve
+whitespace but do not receive syntax highlighting in Formatted. Styling follows
+the application's light/dark theme.
+
+**Raw Markdown** preserves the original source with syntax highlighting (apart
+from stripping a leading UTF-8 BOM). The header Copy button copies that source;
+selection copying in Formatted copies the rendered text. Both views are read-only,
+including task list markers. JSON trees, pointers, jq actions, key hover and JSON
+folding do not apply to Markdown.
+
+Links show their labels and destinations as inert text. Images show their alt
+text and destination, not the image itself. Neither local nor remote resources
+are loaded, and no links are launched. Embedded HTML is shown literally and never
+executed. Empty files and incomplete Markdown are valid; invalid UTF-8 reports an
+error and leaves the previous document intact.
+
+Markdown parsing runs on the existing GIO worker pool. Limits bound source size
+(16 MiB), rendered text (32 MiB), nesting (128 elements) and parser events (one
+million). This is a small-to-medium document viewer, not a full browser renderer;
+HTML layouts, image rendering, math and footnotes are not implemented.
+
 ## Development
 
 ```sh
@@ -224,8 +255,8 @@ explained in `AGENTS.md`.
 Documents and their structural index are held in memory. Pretty-printing
 currently runs on the UI thread; this first version
 is for small to medium documents, not multi-gigabyte log streaming. JSON whitespace
-is not retained; YAML source text is retained for Raw YAML. Editing, JSONPath, pagination, packaging and other
-text formats are not implemented yet.
+is not retained; YAML and Markdown source text is retained for their Raw views.
+Editing, JSONPath, pagination, packaging and other text formats are not implemented yet.
 
 `data/io.github.ravel.Ravel.desktop` is a starter desktop entry for an installed
 `ravel` binary. The application ID is provisional and should be changed to an

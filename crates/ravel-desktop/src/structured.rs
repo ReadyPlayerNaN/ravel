@@ -38,11 +38,15 @@ pub fn create() -> (gtk::Widget, Rc<Structured>) {
 }
 
 impl Structured {
-    /// Renders `document.pointer(pointer)` as a widget tree, replacing prior content.
-    pub fn set_content(&self, document: &Arc<Document>, pointer: &str) {
+    pub fn clear(&self) {
         while let Some(child) = self.column.first_child() {
             self.column.remove(&child);
         }
+    }
+
+    /// Renders `document.pointer(pointer)` as a widget tree, replacing prior content.
+    pub fn set_content(&self, document: &Arc<Document>, pointer: &str) {
+        self.clear();
         if document.value_at(pointer).is_some() {
             self.column
                 .append(&node_widget(document, pointer, &label_for(pointer), 0));
