@@ -56,7 +56,7 @@ fn color_at(buffer: &sourceview5::Buffer, needle: &str) -> gtk::gdk::RGBA {
 pub(crate) fn run() {
     adw::init().unwrap();
     let app = adw::Application::builder()
-        .application_id("io.github.ravel.Ravel.Tests")
+        .application_id("global.zak.ravel.Tests")
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();

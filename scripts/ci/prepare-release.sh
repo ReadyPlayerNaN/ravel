@@ -15,8 +15,8 @@ output=$(realpath "$output")
 bsdtar -xf "$package" -C "$work/payload"
 cd "$work"
 install -Dm755 payload/usr/bin/ravel bundle/bin/ravel
-install -Dm644 payload/usr/share/applications/io.github.ravel.Ravel.desktop \
-    bundle/share/applications/io.github.ravel.Ravel.desktop
+install -Dm644 payload/usr/share/applications/global.zak.ravel.desktop \
+    bundle/share/applications/global.zak.ravel.desktop
 install -Dm644 payload/usr/share/doc/ravel-git/README.md bundle/share/doc/ravel/README.md
 install -Dm644 payload/usr/share/licenses/ravel-git/KaTeX-LICENSE \
     bundle/share/licenses/ravel/KaTeX-LICENSE
@@ -39,6 +39,6 @@ if [[ -d "$output/aur" ]]; then
     mkdir "$work/installed"
     bsdtar -xf "$binary_package" -C "$work/installed"
     cmp "$work/bundle/bin/ravel" "$work/installed/usr/bin/ravel"
-    desktop-file-validate "$work/installed/usr/share/applications/io.github.ravel.Ravel.desktop"
+    desktop-file-validate "$work/installed/usr/share/applications/global.zak.ravel.desktop"
     test -s "$work/installed/usr/share/licenses/ravel-bin/KaTeX-LICENSE"
 fi

@@ -6,7 +6,7 @@ use libadwaita::{self as adw, prelude::*};
 
 fn main() -> glib::ExitCode {
     let app = adw::Application::builder()
-        .application_id("io.github.ravel.Ravel")
+        .application_id("global.zak.ravel")
         .flags(gio::ApplicationFlags::HANDLES_OPEN)
         .build();
 

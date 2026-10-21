@@ -20,8 +20,8 @@ sha256sums_x86_64=('@SHA256@')
 
 package() {
     install -Dm755 "$srcdir/bin/ravel" "$pkgdir/usr/bin/ravel"
-    install -Dm644 "$srcdir/share/applications/io.github.ravel.Ravel.desktop" \
-        "$pkgdir/usr/share/applications/io.github.ravel.Ravel.desktop"
+    install -Dm644 "$srcdir/share/applications/global.zak.ravel.desktop" \
+        "$pkgdir/usr/share/applications/global.zak.ravel.desktop"
     install -Dm644 "$srcdir/share/doc/ravel/README.md" \
         "$pkgdir/usr/share/doc/$pkgname/README.md"
     install -Dm644 "$srcdir/share/licenses/ravel/KaTeX-LICENSE" \

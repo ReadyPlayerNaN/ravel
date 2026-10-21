@@ -334,6 +334,5 @@ is for small to medium documents, not multi-gigabyte log streaming. JSON whitesp
 is not retained; YAML and Markdown source text is retained for their Raw views.
 Editing, JSONPath, pagination, packaging and other text formats are not implemented yet.
 
-`data/io.github.ravel.Ravel.desktop` is a starter desktop entry for an installed
-`ravel` binary. The application ID is provisional and should be changed to an
-owned reverse-DNS namespace before distribution.
+`data/global.zak.ravel.desktop` is the desktop entry bundled for an installed
+`ravel` binary. The application ID is `global.zak.ravel`.
