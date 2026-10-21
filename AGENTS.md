@@ -14,18 +14,24 @@ without an explicit requirement.
   includes or external resource loading. Structured and jq consume normalized JSON;
   Raw YAML uses retained original source (comments, anchors, layout and separators).
   JSON-only hover indexing and delimiter folding must not run on YAML source.
-  `markdown.rs` parses Markdown separately from JSON trees into inert text and
-  semantic style ranges. Preserve source, UTF-8 validation and rendering budgets;
-  never execute HTML or resolve image/link resources.
+  `markdown.rs` / `markdown_html.rs` parse Markdown separately from JSON trees
+  into a text fallback and safe generated HTML (links, headings/index, footnotes,
+  media, math placeholders and task controls). Preserve source, UTF-8 validation
+  and rendering budgets. Core never loads resources; source HTML must be escaped.
 - `crates/ravel-desktop`: native UI, file opening, application actions, and errors.
   `preview.rs` configures the read-only GtkSourceView preview and binds its
   color scheme to Libadwaita's light/dark theme. `key_index.rs` indexes rendered
   keys and their array-wildcard structural paths; `key_hover.rs` handles pointer,
   Shift, and viewport highlighting. `fold_index.rs` indexes container body lines;
   `folding.rs` contributes gutter controls and non-destructive visibility tags.
-  `markdown_view.rs` renders Markdown with native read-only GTK text tags; Markdown
-  has no structural/jq actions or JSON hover/folding. Keep highlighting and folding
-  in this layer; copied text includes hidden content.
+  `markdown_view.rs` uses restricted WebKitGTK for rich Markdown. Only bundled
+  scripts (including KaTeX with trust disabled) run. Keep CSP, ephemeral sessions,
+  denied permissions and navigation policy intact. Media may load from local or
+  HTTP(S) resources; local media gets per-document, read-only sandbox grants. Never
+  disable WebKit's sandbox in application code. Task toggles are temporary DOM
+  state, never saved edits. Markdown has no structural/jq actions or JSON
+  hover/folding. Keep highlighting and folding in this layer; copied text includes
+  hidden content.
   Use the GLib main context for UI tasks and GIO's worker pool for parsing.
 - `examples`: small documents for manual and automated smoke tests.
 
@@ -67,6 +73,7 @@ GDK_BACKEND=x11 GSK_RENDERER=cairo GTK_A11Y=none GIO_USE_VFS=local \
   xvfb-run -a cargo test -p ravel-desktop --locked -- --ignored
 ```
 
-Prefer core tests for document behavior. The explicitly ignored GTK test needs a
-real display or Xvfb. Keep `Cargo.lock` tracked, document public core APIs, avoid
+Prefer core tests for document behavior. The opt-in `gtk-smoke` executable (`--ignored`) needs a real display or Xvfb and
+GStreamer base/good codecs. It runs GTK/WebKit on the process's actual main thread,
+not a Rust test-harness worker. Keep `Cargo.lock` tracked, document public core APIs, avoid
 production `unwrap`/`expect`, and return useful parse errors with source location.

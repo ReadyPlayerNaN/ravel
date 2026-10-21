@@ -1,6 +1,6 @@
 //! Generated markup only: source HTML and every attribute value are escaped.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::ops::Range;
 
 use pulldown_cmark::{Alignment, CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
@@ -9,7 +9,7 @@ use super::{MAX_EVENTS, MAX_NESTING, MAX_RENDERED_BYTES, MarkdownError};
 
 type Result<T> = std::result::Result<T, MarkdownError>;
 
-pub(super) fn render(source: &str) -> Result<String> {
+pub(super) fn render(source: &str) -> Result<(String, Vec<String>)> {
     let options = Options::ENABLE_TABLES
         | Options::ENABLE_STRIKETHROUGH
         | Options::ENABLE_TASKLISTS
@@ -48,7 +48,7 @@ pub(super) fn render(source: &str) -> Result<String> {
     result.push_str(&renderer.output);
     result.push_str("</article>");
     check_size(&result)?;
-    Ok(result)
+    Ok((result, renderer.media_sources.into_iter().collect()))
 }
 
 fn check_size(text: &str) -> Result<()> {
@@ -115,6 +115,7 @@ struct Note {
 #[derive(Default)]
 struct Renderer {
     output: String,
+    media_sources: BTreeSet<String>,
     headings: Vec<(u8, String, String)>,
     ids: HashSet<String>,
     slug_suffixes: HashMap<String, usize>,
@@ -375,6 +376,7 @@ impl Renderer {
             ));
             return;
         }
+        self.media_sources.insert(destination.to_owned());
         let path = destination.split(['?', '#']).next().unwrap_or(destination);
         let extension = path
             .rsplit_once('.')

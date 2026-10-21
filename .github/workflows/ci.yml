@@ -14,7 +14,7 @@ jobs:
     container: fedora:43
     steps:
       - name: Install native dependencies
-        run: dnf install -y gcc git curl-minimal tar pkgconf-pkg-config gtk4-devel libadwaita-devel gtksourceview5-devel jq xorg-x11-server-Xvfb xdotool dbus-daemon mesa-dri-drivers
+        run: dnf install -y gcc git curl-minimal tar pkgconf-pkg-config gtk4-devel libadwaita-devel gtksourceview5-devel webkitgtk6.0-devel gstreamer1-plugins-base gstreamer1-plugins-good jq xorg-x11-server-Xvfb xdotool dbus-daemon mesa-dri-drivers
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -32,6 +32,10 @@ jobs:
           GSK_RENDERER: cairo
           GTK_A11Y: none
           GIO_USE_VFS: local
+          WEBKIT_DISABLE_COMPOSITING_MODE: '1'
+          # The CI container cannot create nested user namespaces. This exception
+          # is only for trusted test fixtures, never application configuration.
+          WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS: '1'
         run: |
           Xvfb :99 -screen 0 1280x800x24 &
           xvfb_pid=$!

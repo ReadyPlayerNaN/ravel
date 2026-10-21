@@ -53,9 +53,7 @@ fn color_at(buffer: &sourceview5::Buffer, needle: &str) -> gtk::gdk::RGBA {
         .unwrap()
 }
 
-#[test]
-#[ignore = "Requires a display; run with xvfb-run -a dbus-run-session -- cargo test -p ravel-desktop -- --ignored"]
-fn opens_documents_full_width_and_displays_statistics() {
+pub(crate) fn run() {
     adw::init().unwrap();
     let app = adw::Application::builder()
         .application_id("io.github.ravel.Ravel.Tests")

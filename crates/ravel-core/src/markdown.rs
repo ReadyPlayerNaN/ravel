@@ -72,6 +72,7 @@ pub struct Markdown {
     text: String,
     spans: Vec<Span>,
     html: String,
+    media_sources: Vec<String>,
 }
 
 impl Markdown {
@@ -106,11 +107,13 @@ impl Markdown {
                 return Err(MarkdownError::ComplexityLimit);
             }
         }
+        let (html, media_sources) = rich::render(source)?;
         Ok(Self {
             source: source.to_owned(),
             text: renderer.text,
             spans: renderer.spans,
-            html: rich::render(source)?,
+            html,
+            media_sources,
         })
     }
 
@@ -131,6 +134,12 @@ impl Markdown {
     /// No resource is resolved or loaded by the core.
     pub fn html(&self) -> &str {
         &self.html
+    }
+
+    /// Distinct allowed media destinations, unresolved and without I/O. The
+    /// desktop uses these to grant read-only sandbox access to local media only.
+    pub fn media_sources(&self) -> &[String] {
+        &self.media_sources
     }
 
     /// Semantic formatting ranges for the rendered text.

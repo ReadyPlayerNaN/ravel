@@ -10,10 +10,6 @@ use sourceview5::prelude::BufferExt;
 
 use ravel_core::{Document, Format, markdown::Markdown};
 
-#[cfg(test)]
-#[path = "markdown_tests.rs"]
-pub(crate) mod markdown_tests;
-
 enum OpenDocument {
     Structured(Arc<Document>),
     Markdown(Markdown),
@@ -38,7 +34,7 @@ struct Viewer {
     view_stack: adw::ViewStack,
     structured_page: adw::ViewStackPage,
     markdown_page: adw::ViewStackPage,
-    markdown: gtk::TextView,
+    markdown: crate::markdown_view::MarkdownView,
     raw_page: adw::ViewStackPage,
     folding: Rc<crate::folding::Folding>,
     copy: gtk::Button,
@@ -46,6 +42,7 @@ struct Viewer {
     status: gtk::Label,
     spinner: gtk::Spinner,
     document: RefCell<Option<OpenDocument>>,
+    source_file: RefCell<Option<gio::File>>,
     generation: Cell<u64>,
 }
 
@@ -129,14 +126,9 @@ fn build(app: &adw::Application) -> (adw::ApplicationWindow, Rc<Viewer>) {
         "Structured",
         "view-list-symbolic",
     );
-    let markdown = crate::markdown_view::create();
-    let markdown_scroll = gtk::ScrolledWindow::builder()
-        .child(&markdown)
-        .vexpand(true)
-        .hexpand(true)
-        .build();
+    let markdown = crate::markdown_view::MarkdownView::new(&window);
     let markdown_page = view_stack.add_titled_with_icon(
-        &markdown_scroll,
+        markdown.widget(),
         Some("formatted"),
         "Formatted",
         "text-x-generic-symbolic",
@@ -198,6 +190,7 @@ fn build(app: &adw::Application) -> (adw::ApplicationWindow, Rc<Viewer>) {
         status,
         spinner,
         document: RefCell::new(None),
+        source_file: RefCell::new(None),
         generation: Cell::new(0),
     });
     let open_action = gio::SimpleAction::new("open", None);
@@ -262,9 +255,7 @@ fn build(app: &adw::Application) -> (adw::ApplicationWindow, Rc<Viewer>) {
     // Keep state alive with the window, without a strong reference back to it.
     window.connect_destroy({
         let viewer = Rc::clone(&viewer);
-        move |_| {
-            let _ = &viewer;
-        }
+        move |_| viewer.markdown.clear()
     });
     (window, viewer)
 }
@@ -347,6 +338,7 @@ impl Viewer {
                 match result {
                     Ok(document) => {
                         *viewer.document.borrow_mut() = Some(document);
+                        *viewer.source_file.borrow_mut() = Some(file);
                         viewer.title.set_title(&name);
                         viewer.title.set_subtitle("Ravel · Read only");
                         if let Some(window) = viewer.window.upgrade() {
@@ -383,14 +375,16 @@ impl Viewer {
                     .as_ref(),
             );
         }
-        crate::markdown_view::set_content(&self.markdown, document);
+        if let Some(file) = self.source_file.borrow().as_ref() {
+            self.markdown.set_content(document, file);
+        }
         self.raw_page.set_title(Some("Raw Markdown"));
         self.copy.set_tooltip_text(Some("Copy Markdown source"));
         self.copy.set_hexpand(true);
         self.copy.set_halign(gtk::Align::End);
         self.pointer.set_visible(false);
         self.status
-            .set_text("Markdown · Read only · Links and images are not loaded");
+            .set_text("Markdown · Read only · Media enabled · Task changes are not saved");
         self.markdown_page.set_visible(true);
         self.structured_page.set_visible(false);
         self.view_stack.set_visible_child_name("formatted");
@@ -416,8 +410,7 @@ impl Viewer {
             self.view_stack.set_visible_child_name("structured");
         }
         self.markdown_page.set_visible(false);
-        // Keep an actual buffer: clearing it to None can race GTK's queued layout.
-        self.markdown.set_buffer(Some(&gtk::TextBuffer::new(None)));
+        self.markdown.clear();
         self.pointer.set_visible(true);
         self.copy.set_hexpand(false);
         self.set_node_actions_enabled(true);

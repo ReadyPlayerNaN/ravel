@@ -1,8 +1,43 @@
+use std::{
+    io::{Read, Write},
+    net::TcpListener,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
+
 use super::build;
 use crate::ui_tests::{find, wait_for};
 use gtk::{gio, glib};
 use libadwaita::{self as adw, prelude::*};
 use sourceview5::prelude::*;
+use webkit6::prelude::*;
+
+#[track_caller]
+fn eval(view: &webkit6::WebView, script: &str) -> webkit6::javascriptcore::Value {
+    let result = std::rc::Rc::new(std::cell::RefCell::new(None));
+    let received = std::rc::Rc::clone(&result);
+    view.evaluate_javascript(
+        script,
+        None,
+        None,
+        None::<&gio::Cancellable>,
+        move |value| {
+            *received.borrow_mut() = Some(value);
+        },
+    );
+    wait_for(|| result.borrow().is_some());
+    result.borrow_mut().take().unwrap().unwrap()
+}
+
+fn ready(view: &webkit6::WebView) {
+    wait_for(|| {
+        !view.is_loading()
+            && eval(view, "document.documentElement.dataset.ready === 'true'").to_boolean()
+    });
+}
 
 pub(crate) fn run(app: &adw::Application) {
     let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
@@ -20,6 +55,8 @@ pub(crate) fn run(app: &adw::Application) {
             .title()
             .is_some_and(|title| title.contains("sample.md"))
     });
+    let view = &viewer.markdown.view().unwrap();
+    ready(view);
 
     let widget = window.clone().upcast::<gtk::Widget>();
     let stack = find::<adw::ViewStack>(&widget, Some("view-stack")).unwrap();
@@ -27,58 +64,124 @@ pub(crate) fn run(app: &adw::Application) {
     assert!(!viewer.structured_page.is_visible());
     assert!(viewer.markdown_page.is_visible());
     let tree = find::<gtk::Box>(&widget, Some("structured-view")).unwrap();
+    assert!(tree.first_child().is_none());
+    assert!(!view.is_editable());
+    assert!(view.is_focusable());
     assert!(
-        tree.first_child().is_none(),
-        "Old structured nodes must be released"
+        eval(
+            view,
+            "document.querySelector('h1').textContent === 'Ravel Markdown'"
+        )
+        .to_boolean()
     );
-    let formatted = find::<gtk::TextView>(&widget, Some("markdown-formatted")).unwrap();
-    wait_for(|| formatted.is_mapped());
-    assert!(!formatted.is_editable());
-    assert_eq!(formatted.wrap_mode(), gtk::WrapMode::WordChar);
-    let buffer = formatted.buffer();
-    let text = buffer.text(&buffer.start_iter(), &buffer.end_iter(), true);
-    assert!(text.starts_with("Ravel Markdown\n"));
-    assert!(!text.contains("# Ravel"));
-    let heading = buffer.tag_table().lookup("heading-1").unwrap();
-    assert!(buffer.start_iter().has_tag(&heading));
-    assert!(heading.scale() > 1.0);
-    let bold = text.find("read-only").unwrap();
     assert!(
-        buffer
-            .iter_at_offset(text[..bold].chars().count() as i32)
-            .has_tag(&buffer.tag_table().lookup("strong").unwrap())
+        eval(
+            view,
+            "document.querySelector('strong').textContent === 'read-only'"
+        )
+        .to_boolean()
     );
-    assert!(text.contains("<script>not executed</script>"));
-    assert!(text.contains("[Image: Example image] (https://example.org/image.png)"));
-    let cell = text.find("Feature\tStatus").unwrap();
+    assert!(eval(view, "document.querySelector('.literal-html').textContent.includes('<script>not executed</script>')").to_boolean());
     assert!(
-        buffer
-            .iter_at_offset(text[..cell].chars().count() as i32)
-            .tags()
-            .iter()
-            .any(|tag| tag.tabs().is_some())
+        eval(
+            view,
+            "document.querySelectorAll('.math .katex').length === 3"
+        )
+        .to_boolean()
     );
+    assert!(eval(view, "document.querySelectorAll('.math math').length === 3").to_boolean());
+    assert!(
+        eval(
+            view,
+            "document.querySelectorAll('.math mfrac').length === 2"
+        )
+        .to_boolean()
+    );
+    assert!(
+        eval(
+            view,
+            "document.querySelectorAll('.math-error').length === 0"
+        )
+        .to_boolean()
+    );
+    wait_for(|| eval(view, "document.fonts.check('16px KaTeX_Main')").to_boolean());
+
+    // The contents index and footnotes use same-document navigation, including
+    // focus movement and back-links for repeated references.
+    eval(
+        view,
+        "document.querySelector('a[href=\"#lists-and-quotes\"]').click()",
+    );
+    wait_for(|| {
+        eval(view, "location.hash === '#lists-and-quotes' && document.activeElement.id === 'lists-and-quotes'").to_boolean()
+    });
+    eval(
+        view,
+        "document.querySelector('a[role=doc-noteref]').click()",
+    );
+    wait_for(|| eval(view, "document.activeElement.id === 'ravel-fn-1'").to_boolean());
+    eval(
+        view,
+        "document.querySelector('a[role=doc-backlink]').click()",
+    );
+    wait_for(|| eval(view, "document.activeElement.id === 'ravel-ref-1-1'").to_boolean());
+    assert!(eval(view, "document.querySelector('a[href=\"https://example.org\"]').href === 'https://example.org/'").to_boolean());
 
     let styles = adw::StyleManager::default();
     let original_scheme = styles.color_scheme();
-    let code = buffer.tag_table().lookup("code-block").unwrap();
     styles.set_color_scheme(adw::ColorScheme::ForceLight);
-    let light = code.paragraph_background_rgba().unwrap();
+    wait_for(|| eval(view, "document.documentElement.dataset.theme === 'light'").to_boolean());
+    let light = eval(
+        view,
+        "getComputedStyle(document.documentElement).backgroundColor",
+    )
+    .to_string();
     styles.set_color_scheme(adw::ColorScheme::ForceDark);
-    assert_ne!(light, code.paragraph_background_rgba().unwrap());
+    wait_for(|| eval(view, "document.documentElement.dataset.theme === 'dark'").to_boolean());
+    assert_ne!(
+        light,
+        eval(
+            view,
+            "getComputedStyle(document.documentElement).backgroundColor"
+        )
+        .to_string()
+    );
     styles.set_color_scheme(original_scheme);
 
-    for name in ["node-copy", "node-pointer", "node-jq"] {
-        assert!(!window.lookup_action(name).unwrap().is_enabled());
+    let source = std::fs::read_to_string(examples.join("sample.md")).unwrap();
+    let was_checked = eval(view, "document.querySelector('input.task').checked").to_boolean();
+    eval(view, "document.querySelector('input.task').click()");
+    assert_ne!(
+        was_checked,
+        eval(view, "document.querySelector('input.task').checked").to_boolean()
+    );
+    if std::env::var("GDK_BACKEND").as_deref() == Ok("x11")
+        && std::process::Command::new("xdotool")
+            .arg("--version")
+            .output()
+            .is_ok()
+    {
+        assert!(view.grab_focus());
+        eval(
+            view,
+            "document.querySelector('input.task').scrollIntoView(); document.querySelector('input.task').focus()",
+        );
+        assert!(
+            std::process::Command::new("xdotool")
+                .args(["key", "space"])
+                .status()
+                .unwrap()
+                .success()
+        );
+        wait_for(|| {
+            eval(view, "document.querySelector('input.task').checked").to_boolean() == was_checked
+        });
     }
-    assert!(!viewer.pointer.is_visible());
-    assert!(viewer.status.text().starts_with("Markdown · Read only"));
     assert_eq!(
-        viewer.copy.tooltip_text().as_deref(),
-        Some("Copy Markdown source")
+        std::fs::read_to_string(examples.join("sample.md")).unwrap(),
+        source
     );
     viewer.copy.emit_clicked();
-    let source = std::fs::read_to_string(examples.join("sample.md")).unwrap();
     assert_eq!(
         glib::MainContext::default()
             .block_on(window.clipboard().read_text_future())
@@ -86,16 +189,60 @@ pub(crate) fn run(app: &adw::Application) {
             .unwrap(),
         source
     );
-    buffer.select_range(&buffer.start_iter(), &buffer.end_iter());
-    formatted.emit_by_name::<()>("copy-clipboard", &[]);
-    assert_eq!(
+    eval(
+        view,
+        "var range = document.createRange(); range.selectNodeContents(document.querySelector('h1')); getSelection().removeAllRanges(); getSelection().addRange(range)",
+    );
+    view.execute_editing_command("Copy");
+    wait_for(|| {
         glib::MainContext::default()
             .block_on(window.clipboard().read_text_future())
             .unwrap()
-            .unwrap(),
-        text
-    );
+            .is_some_and(|text| text == "Ravel Markdown")
+    });
 
+    // Real local image decode and audio/video metadata, with no autoplay. The
+    // smoke-test environment needs GStreamer's base/good codec packages.
+    eval(view, "document.querySelector('img').loading = 'eager'");
+    wait_for(|| eval(view, "document.querySelector('img').complete").to_boolean());
+    assert!(
+        eval(view, "document.querySelector('img').naturalWidth === 480").to_boolean(),
+        "{}",
+        eval(
+            view,
+            "JSON.stringify({uri:location.href, img:document.querySelector('img').outerHTML, src:document.querySelector('img').src, error:document.querySelector('.media-error').hidden})"
+        )
+    );
+    wait_for(|| {
+        eval(view, "Array.from(document.querySelectorAll('audio,video')).every(m => m.readyState >= 1 || m.error)").to_boolean()
+    });
+    assert!(eval(view, "Array.from(document.querySelectorAll('audio,video')).every(m => m.readyState >= 1 && m.duration > 1 && m.controls && m.paused)").to_boolean(), "{}", eval(view, "JSON.stringify(Array.from(document.querySelectorAll('audio,video')).map(m => ({src:m.src, error:m.error && m.error.message, code:m.error && m.error.code, state:m.readyState, duration:m.duration})))"));
+    assert!(eval(view, "document.querySelector('video').videoWidth === 320").to_boolean());
+    eval(
+        view,
+        "window.playbackError = ''; var video = document.querySelector('video'); video.scrollIntoView(); video.muted = true; video.play().catch(e => window.playbackError = String(e)); undefined;",
+    );
+    wait_for(|| {
+        eval(
+            view,
+            "!!window.playbackError || document.querySelector('video').currentTime > 0.05",
+        )
+        .to_boolean()
+    });
+    assert_eq!(eval(view, "window.playbackError").to_string(), "");
+    eval(
+        view,
+        "document.querySelectorAll('audio,video').forEach(m => { m.pause(); m.currentTime = 1; })",
+    );
+    wait_for(|| {
+        eval(view, "Array.from(document.querySelectorAll('audio,video')).every(m => m.paused && !m.seeking && m.currentTime >= 1)").to_boolean()
+    });
+
+    for name in ["node-copy", "node-pointer", "node-jq"] {
+        assert!(!window.lookup_action(name).unwrap().is_enabled());
+    }
+    assert!(!viewer.pointer.is_visible());
+    assert!(viewer.status.text().contains("Task changes are not saved"));
     stack.set_visible_child_name("raw");
     wait_for(|| viewer.text.is_mapped());
     let raw = viewer
@@ -110,7 +257,6 @@ pub(crate) fn run(app: &adw::Application) {
     let folds = find::<sourceview5::GutterRendererText>(&widget, Some("code-folds")).unwrap();
     assert!(!folds.is_visible());
 
-    // Failed UTF-8 opens preserve the existing Markdown document and selected tab.
     let directory = std::env::temp_dir().join(format!(
         "ravel-markdown-tests-{}-{}",
         std::process::id(),
@@ -141,7 +287,77 @@ pub(crate) fn run(app: &adw::Application) {
     );
     alert.close();
 
-    // Switching back restores JSON-only behavior and releases Markdown text.
+    // HTTP media uses WebKit's loader; no source scripts, cookies, or referrers.
+    let server = MediaServer::start();
+    let remote = directory.join("media and math.md");
+    std::fs::write(&remote, format!("# Media\n\n![Remote]({}/image.svg)\n\n![Audio]({}/tone.ogg)\n\n![Video]({}/demo.webm)\n\n![Missing]({}/missing.png)\n\n$\\notARealCommand$\n\n$\\href{{javascript:alert(1)}}{{evil}}$\n\n<script>window.sourceExecuted = true</script>\n\n[unsafe](javascript:alert%281%29)", server.url, server.url, server.url, server.url)).unwrap();
+    viewer.load(gio::File::for_path(&remote));
+    wait_for(|| {
+        window
+            .title()
+            .is_some_and(|title| title.contains("media and math.md"))
+    });
+    let view = &viewer.markdown.view().unwrap();
+    ready(view);
+    eval(
+        view,
+        "document.querySelectorAll('img').forEach(i => i.loading = 'eager')",
+    );
+    wait_for(|| eval(view, "document.querySelector('img').complete").to_boolean());
+    assert!(
+        eval(view, "document.querySelector('img').naturalWidth === 480").to_boolean(),
+        "{}; requests: {:?}",
+        eval(
+            view,
+            "JSON.stringify({img:document.querySelector('img').src,error:document.querySelector('.media-error').hidden})"
+        ),
+        server.requests.lock().unwrap()
+    );
+    wait_for(|| {
+        eval(
+            view,
+            "Array.from(document.querySelectorAll('audio,video')).every(m => m.readyState >= 1 || m.error)",
+        )
+        .to_boolean()
+    });
+    assert!(
+        eval(
+            view,
+            "Array.from(document.querySelectorAll('audio,video')).every(m => m.readyState >= 1)"
+        )
+        .to_boolean(),
+        "{}; requests: {:?}",
+        eval(
+            view,
+            "JSON.stringify(Array.from(document.querySelectorAll('audio,video')).map(m => ({src:m.src, error:m.error && m.error.message, code:m.error && m.error.code, state:m.readyState})))"
+        ),
+        server.requests.lock().unwrap()
+    );
+    wait_for(|| {
+        eval(
+            view,
+            "!!document.querySelector('.media-error:not([hidden])')",
+        )
+        .to_boolean()
+    });
+    assert!(eval(view, "!!document.querySelector('.math-error')").to_boolean());
+    assert!(eval(view, "typeof window.sourceExecuted === 'undefined' && !document.querySelector('a[href^=\"javascript:\"]')").to_boolean());
+    eval(
+        view,
+        "window.cspBlocked = false; document.addEventListener('securitypolicyviolation', () => window.cspBlocked = true); var injected = document.createElement('script'); injected.textContent = 'window.sourceExecuted = true'; document.body.append(injected)",
+    );
+    wait_for(|| eval(view, "window.cspBlocked").to_boolean());
+    assert!(eval(view, "typeof window.sourceExecuted === 'undefined'").to_boolean());
+    assert!(
+        server
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|request| !request.to_ascii_lowercase().contains("referer:")
+                && !request.to_ascii_lowercase().contains("cookie:"))
+    );
+
     viewer.load(gio::File::for_path(examples.join("sample.json")));
     wait_for(|| {
         window
@@ -151,16 +367,19 @@ pub(crate) fn run(app: &adw::Application) {
     assert_eq!(stack.visible_child_name().as_deref(), Some("structured"));
     assert!(!viewer.markdown_page.is_visible());
     assert!(viewer.structured_page.is_visible());
-    assert_eq!(formatted.buffer().char_count(), 0);
+    assert!(viewer.markdown.view().is_none());
+    assert!(view.parent().is_none());
+    assert!(
+        view.is_muted(),
+        "Detached views must stop producing audio immediately"
+    );
     assert!(viewer.pointer.is_visible());
     assert!(folds.is_visible());
     assert_eq!(raw.language().unwrap().id(), "json");
     assert!(window.lookup_action("node-jq").unwrap().is_enabled());
-    assert_eq!(viewer.copy.tooltip_text().as_deref(), Some("Copy JSON"));
 
     let empty = directory.join("empty.MARKDOWN");
     std::fs::write(&empty, b"\xef\xbb\xbf").unwrap();
-    // A newer open wins even if an earlier parse is still pending.
     viewer.load(gio::File::for_path(examples.join("sample.md")));
     viewer.load(gio::File::for_path(&empty));
     wait_for(|| {
@@ -168,7 +387,9 @@ pub(crate) fn run(app: &adw::Application) {
             .title()
             .is_some_and(|title| title.contains("empty.MARKDOWN"))
     });
-    assert_eq!(formatted.buffer().char_count(), 0);
+    let view = &viewer.markdown.view().unwrap();
+    ready(view);
+    assert!(eval(view, "document.querySelector('article').textContent === ''").to_boolean());
     assert_eq!(stack.visible_child_name().as_deref(), Some("formatted"));
     assert_eq!(viewer.text.buffer().char_count(), 0);
     viewer.load(gio::File::for_path(examples.join("sample.yaml")));
@@ -182,4 +403,108 @@ pub(crate) fn run(app: &adw::Application) {
     assert!(!folds.is_visible());
     window.close();
     std::fs::remove_dir_all(directory).unwrap();
+}
+
+struct MediaServer {
+    url: String,
+    requests: Arc<Mutex<Vec<String>>>,
+    stop: Arc<AtomicBool>,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+
+impl MediaServer {
+    fn start() -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let stop = Arc::new(AtomicBool::new(false));
+        let thread_stop = Arc::clone(&stop);
+        let thread_requests = Arc::clone(&requests);
+        let thread = std::thread::spawn(move || {
+            while !thread_stop.load(Ordering::Relaxed) {
+                let Ok((mut stream, _)) = listener.accept() else {
+                    std::thread::sleep(Duration::from_millis(5));
+                    continue;
+                };
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(1)))
+                    .unwrap();
+                stream
+                    .set_write_timeout(Some(Duration::from_secs(1)))
+                    .unwrap();
+                let mut bytes = [0; 8192];
+                let Ok(length) = stream.read(&mut bytes) else {
+                    continue;
+                };
+                let request = String::from_utf8_lossy(&bytes[..length]).into_owned();
+                let (mime, body): (&str, &[u8]) = match request.split_whitespace().nth(1) {
+                    Some("/image.svg") => (
+                        "image/svg+xml",
+                        include_bytes!("../../../examples/media/ravel.svg"),
+                    ),
+                    Some("/tone.ogg") => (
+                        "audio/ogg",
+                        include_bytes!("../../../examples/media/tone.ogg"),
+                    ),
+                    Some("/demo.webm") => (
+                        "video/webm",
+                        include_bytes!("../../../examples/media/demo.webm"),
+                    ),
+                    _ => ("text/plain", b""),
+                };
+                let range = request
+                    .lines()
+                    .find_map(|line| line.strip_prefix("Range: bytes="))
+                    .and_then(|range| range.split_once('-'))
+                    .and_then(|(start, end)| {
+                        Some((
+                            start.parse::<usize>().ok()?,
+                            end.parse::<usize>().unwrap_or(body.len().saturating_sub(1)),
+                        ))
+                    })
+                    .filter(|&(start, end)| start <= end && end < body.len());
+                thread_requests.lock().unwrap().push(request);
+                let (status, range_header, body) = if let Some((start, end)) = range {
+                    (
+                        "206 Partial Content",
+                        format!("Content-Range: bytes {start}-{end}/{}\r\n", body.len()),
+                        &body[start..=end],
+                    )
+                } else {
+                    (
+                        if body.is_empty() {
+                            "404 Not Found"
+                        } else {
+                            "200 OK"
+                        },
+                        String::new(),
+                        body,
+                    )
+                };
+                let header = format!(
+                    "HTTP/1.1 {status}\r\nContent-Type: {mime}\r\nAccept-Ranges: bytes\r\n{range_header}Content-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                );
+                let _ = stream
+                    .write_all(header.as_bytes())
+                    .and_then(|_| stream.write_all(body));
+            }
+        });
+        Self {
+            url,
+            requests,
+            stop,
+            thread: Some(thread),
+        }
+    }
+}
+
+impl Drop for MediaServer {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+        if let Some(thread) = self.thread.take() {
+            thread.join().unwrap();
+        }
+    }
 }

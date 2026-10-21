@@ -1,28 +1,5 @@
-mod fold_index;
-mod folding;
-mod jq;
-mod key_hover;
-mod key_index;
-mod markdown_view;
-mod preview;
-mod structured;
-mod syntax_label;
-mod tree_navigation;
-#[cfg(test)]
-mod tree_navigation_tests;
-mod tree_tab;
+include!("viewer_modules.rs");
 mod window;
-#[cfg(test)]
-mod yaml_tests;
-
-#[cfg(test)]
-mod fold_tests;
-#[cfg(test)]
-mod hover_tests;
-#[cfg(test)]
-mod structured_tests;
-#[cfg(test)]
-mod ui_tests;
 
 use gtk::{gio, glib};
 use libadwaita::{self as adw, prelude::*};

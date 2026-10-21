@@ -117,6 +117,12 @@ fn task_checkboxes_are_interactive_without_changing_source() {
 }
 
 #[test]
+fn media_inventory_is_deduplicated_and_never_includes_source_html_or_links() {
+    let document = Markdown::parse(b"![a](media/movie.webm) ![b](media/movie.webm) [link](other.md) ![blocked](javascript:evil)\n\n<img src=\"secret.png\">\n").unwrap();
+    assert_eq!(document.media_sources(), ["media/movie.webm"]);
+}
+
+#[test]
 fn tables_honor_alignment_hints() {
     let html = render("| Left | Center | Right |\n| :--- | :---: | ---: |\n| a | b | c |");
     assert!(html.contains("<th style=\"text-align:center\">Center</th>"));

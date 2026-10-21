@@ -8,10 +8,18 @@ rust-version.workspace = true
 name = "ravel"
 path = "src/main.rs"
 
+[[test]]
+name = "gtk-smoke"
+path = "src/gtk_smoke.rs"
+harness = false
+
 [dependencies]
 libadwaita.workspace = true
 gtk.workspace = true
 sourceview5.workspace = true
+webkit6.workspace = true
+include_dir.workspace = true
+url.workspace = true
 ravel-core.workspace = true
 serde_json.workspace = true
 

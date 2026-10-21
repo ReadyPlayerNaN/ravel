@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="160" viewBox="0 0 480 160">
+  <rect width="480" height="160" rx="20" fill="#3584e4"/>
+  <path d="M35 110 C85 0 125 160 175 55 S265 140 310 45" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round"/>
+  <text x="335" y="90" fill="#fff" font-family="sans-serif" font-size="32">Ravel</text>
+</svg>

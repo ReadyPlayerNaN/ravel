@@ -15,7 +15,8 @@ Supports JSON, JSON Lines, YAML and formatted Markdown.
   and **Raw** (JSON preview) or **Raw YAML** (original YAML source).
   Structured is the default for JSON and YAML.
 - Read Markdown in **Formatted** by default, with headings, emphasis, lists,
-  quotes, code and tables, or switch to **Raw Markdown** for the original source.
+  quotes, code, tables, clickable links, a heading index, images, audio/video,
+  footnotes and math, or switch to **Raw Markdown** for the original source.
 - Right-click any structured node to copy its JSON or JSON Pointer, or run common
   type-specific **jq** operations. Results open in a read-only, copyable dialog;
   the original document is never changed.
@@ -43,6 +44,9 @@ This is not a text editor.
 - GTK **4.12+** development libraries.
 - Libadwaita **1.6+** development libraries.
 - GtkSourceView **5.4+** development libraries.
+- WebKitGTK **6.0 API / 2.40+** development libraries for rich Markdown.
+- GStreamer base/good plugins for audio/video (including Ogg/Vorbis and WebM/VP8
+  used by the examples and tests). Other formats require their system codecs.
 - `jq` on `PATH` for node operations and desktop integration tests; viewing works
   without it and operations report a clear error if it is missing.
 - A graphical session (Wayland or X11) to run the application.
@@ -50,11 +54,12 @@ This is not a text editor.
 On a recent Fedora release:
 
 ```sh
-sudo dnf install gcc pkgconf-pkg-config gtk4-devel libadwaita-devel gtksourceview5-devel jq
+sudo dnf install gcc pkgconf-pkg-config gtk4-devel libadwaita-devel gtksourceview5-devel webkitgtk6.0-devel gstreamer1-plugins-base gstreamer1-plugins-good jq
 ```
 
 Debian/Ubuntu package names are `build-essential`, `pkg-config`, `libgtk-4-dev`
-`libadwaita-1-dev`, `libgtksourceview-5-dev` and `jq`; check the versions above, since
+`libadwaita-1-dev`, `libgtksourceview-5-dev`, `libwebkitgtk-6.0-dev`,
+`gstreamer1.0-plugins-base`, `gstreamer1.0-plugins-good` and `jq`; check the versions above, since
 older releases such as Ubuntu 24.04 ship an insufficient Libadwaita version.
 
 ## Run
@@ -196,31 +201,84 @@ loading is enabled. A failed parse leaves the previous document unchanged.
 
 ## Markdown conventions
 
-`.md` and `.markdown` files (case-insensitive) open as formatted, selectable,
-read-only documents using native GTK text rendering, not a web browser.
-CommonMark headings, paragraphs, emphasis, bold, inline/fenced/indented code,
-ordered and unordered nested lists, block quotes and horizontal rules are supported,
-along with strikethrough, task lists and tables. Tables use aligned, left-aligned
-columns; Markdown column alignment hints are not applied. Code blocks preserve
-whitespace but do not receive syntax highlighting in Formatted. Styling follows
+`.md` and `.markdown` files (case-insensitive) open as formatted, selectable
+read-only documents in a restricted WebKitGTK pane. CommonMark formatting,
+strikethrough and tables (including column alignment) are supported. Code blocks
+preserve whitespace but are not syntax-highlighted in Formatted. Styling follows
 the application's light/dark theme.
 
-**Raw Markdown** preserves the original source with syntax highlighting (apart
-from stripping a leading UTF-8 BOM). The header Copy button copies that source;
-selection copying in Formatted copies the rendered text. Both views are read-only,
-including task list markers. JSON trees, pointers, jq actions, key hover and JSON
-folding do not apply to Markdown.
+### Links, headings and footnotes
 
-Links show their labels and destinations as inert text. Images show their alt
-text and destination, not the image itself. Neither local nor remote resources
-are loaded, and no links are launched. Embedded HTML is shown literally and never
-executed. Empty files and incomplete Markdown are valid; invalid UTF-8 reports an
-error and leaves the previous document intact.
+Normal, reference-style and autolink hyperlinks are clickable and keyboard
+focusable. HTTP(S) and email links open in the system browser/mail application;
+local file links use an application chooser rather than silently launching files.
+Relative destinations resolve against the Markdown file, not the working directory.
+Active or unsupported schemes such as `javascript:` are not clickable.
 
-Markdown parsing runs on the existing GIO worker pool. Limits bound source size
-(16 MiB), rendered text (32 MiB), nesting (128 elements) and parser events (one
-million). This is a small-to-medium document viewer, not a full browser renderer;
-HTML layouts, image rendering, math and footnotes are not implemented.
+Headings have automatic lowercase anchors (punctuation removed, spaces replaced
+with hyphens; repeated names get `-1`, `-2`, etc.). Unicode headings are supported.
+Use `[Section](#section)` for internal navigation, or `## Title {#custom}` for an
+explicit ID. The collapsible **Contents** index links to every heading. Navigation
+moves keyboard focus as well as scrolling. Footnotes use `[^name]` references and
+`[^name]: ...` definitions, with formatted, multi-paragraph notes collected at the
+end and a separate return link for each reference.
+
+### Images, audio and video
+
+Images render inline, including PNG, JPEG, GIF, WebP, SVG and other formats
+supported by WebKit. Standard image syntax also embeds audio/video based on the
+file extension; an explicit `"audio"` or `"video"` title supports extensionless URLs:
+
+```markdown
+![Picture](images/picture.png "Caption")
+![Movie](media/demo.webm)
+![Music](media/track.ogg)
+![Stream](https://example.org/play?id=123 "video")
+```
+
+Relative paths, absolute `file:` URLs and HTTP(S) media URLs are supported. Images
+scale to the available width; audio/video has play/pause, seek and volume controls,
+and video supports fullscreen. Media never autoplays. Missing resources and
+unsupported formats show an error rather than replacing the document. Codec
+availability is determined by WebKit/GStreamer and the installed distribution
+plugins; DRM sites, iframe players and arbitrary embedded HTML are not supported.
+
+**Opening Markdown can contact remote media servers** (images load lazily and
+players may fetch metadata). No document referrer, persistent cookies or stored
+credentials are sent. Each document gets an ephemeral session and fresh sandbox;
+only explicitly referenced local media files receive read-only sandbox access.
+
+### Math and task lists
+
+Inline `$...$` and display `$$...$$` math are typeset with bundled **KaTeX 0.19.0**,
+including fractions, roots, matrices, aligned equations and TeX symbols supported
+by KaTeX. MathML is included for accessibility. No CDN or Node runtime is needed;
+typesetting works offline. Unsupported/invalid TeX remains visible with a diagnostic.
+This is KaTeX's math language, not a full LaTeX document compiler: shell execution,
+file includes, HTML commands and trusted URL commands are not enabled. Expansion,
+size and text budgets bound math work (32 KiB per expression, 1 MiB total TeX).
+
+`- [ ]` and `- [x]` render as accessible, keyboard-operable checkboxes, including
+nested lists. **Toggles are temporary viewing state, not edits**: switching to Raw
+and back preserves them, but reopening/replacing a document resets them. Source
+text and files are never changed, and the header Copy button still copies the
+original Markdown.
+
+### Source and safety
+
+**Raw Markdown** preserves source with syntax highlighting, apart from stripping a
+leading UTF-8 BOM. Selection copying in Formatted copies rendered text. JSON trees,
+pointers, jq actions, key hover and JSON folding do not apply to Markdown.
+
+Embedded HTML remains literal text, including `<script>`, `<img>`, `<audio>` and
+`<video>` tags. Only Ravel-generated markup and bundled application scripts run;
+a restrictive Content Security Policy blocks source scripts, frames, forms and
+remote scripts. Camera, microphone and other permission requests are denied.
+
+Empty files and incomplete Markdown are valid; invalid UTF-8 leaves the previous
+document intact. Parsing runs on the GIO worker pool, with limits of 16 MiB source,
+32 MiB rendered output, 128 nested elements and one million parser events. Assets
+and their license/update instructions are in `crates/ravel-desktop/assets/markdown`.
 
 ## Development
 
@@ -236,8 +294,11 @@ The core can be tested without GTK development libraries:
 cargo test -p ravel-core --locked
 ```
 
-The ignored GTK smoke test exercises real widgets. Install `xdotool` alongside
-Xvfb to also run native X11 arrow/Tab keystroke checks (CI installs both).
+The opt-in GTK smoke executable runs on the process's actual main thread, as
+required by WebKit. Normal `cargo test` skips it; `--ignored` enables it. It covers
+real widgets, Markdown navigation, math, CSP, local/HTTP media, video playback,
+copying and document replacement. Install GStreamer's base/good codecs, and
+`xdotool` alongside Xvfb for native X11 arrow/Tab checks (CI installs these).
 With Xvfb installed:
 
 ```sh
