@@ -1,8 +1,11 @@
 //! Safe, toolkit-independent Markdown presentation, separate from JSON trees.
 //!
-//! CommonMark plus tables, task lists and strikethrough are parsed into text and
-//! overlapping style ranges. HTML stays literal; images and links become inert
-//! text with their destinations visible. No files or network resources are read.
+//! CommonMark has both a plain-text/style-range fallback and a rich HTML
+//! presentation with headings, links, media, footnotes, math and task controls.
+//! Source HTML always stays literal. No files or network resources are read.
+
+#[path = "markdown_html.rs"]
+mod rich;
 
 use std::ops::Range;
 
@@ -68,6 +71,7 @@ pub struct Markdown {
     source: String,
     text: String,
     spans: Vec<Span>,
+    html: String,
 }
 
 impl Markdown {
@@ -106,6 +110,7 @@ impl Markdown {
             source: source.to_owned(),
             text: renderer.text,
             spans: renderer.spans,
+            html: rich::render(source)?,
         })
     }
 
@@ -114,9 +119,18 @@ impl Markdown {
         &self.source
     }
 
-    /// Rendered, selectable text without Markdown formatting delimiters.
+    /// Plain-text fallback without Markdown formatting delimiters.
+    /// Links and images retain visible destinations; rich extensions are in [`Self::html`].
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    /// Safe HTML presentation with a heading index, links, media, footnotes,
+    /// task controls and TeX math placeholders. Source HTML is escaped, never
+    /// passed through. The desktop supplies styling and trusted math typesetting.
+    /// No resource is resolved or loaded by the core.
+    pub fn html(&self) -> &str {
+        &self.html
     }
 
     /// Semantic formatting ranges for the rendered text.
