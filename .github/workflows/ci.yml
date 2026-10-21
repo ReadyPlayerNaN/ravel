@@ -42,3 +42,33 @@ jobs:
           trap 'kill "$xvfb_pid"' EXIT
           sleep 2
           dbus-run-session -- cargo test -p ravel-desktop --locked -- --ignored
+
+  arch-package:
+    needs: rust
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container: archlinux:base-devel
+    env:
+      CARGO_BUILD_JOBS: '2'
+    steps:
+      - name: Install packaging tools
+        run: |
+          pacman -Syu --noconfirm --needed git rust shellcheck desktop-file-utils
+          useradd --create-home builder
+          echo 'builder ALL=(ALL) NOPASSWD: /usr/bin/pacman' > /etc/sudoers.d/builder
+          chmod 440 /etc/sudoers.d/builder
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Build and check the tested commit as an Arch package
+        run: |
+          chown -R builder:builder "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
+          sudo -u builder --preserve-env=GITHUB_SHA,CARGO_BUILD_JOBS \
+            bash scripts/ci/build-arch-package.sh "$RUNNER_TEMP/ravel-package"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ravel-git-arch-${{ github.sha }}
+          path: ${{ runner.temp }}/ravel-package/*.pkg.tar.zst
+          if-no-files-found: error
+          retention-days: 7

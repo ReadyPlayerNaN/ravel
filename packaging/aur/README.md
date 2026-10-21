@@ -24,6 +24,15 @@ The project currently has **no declared license**. The metadata therefore uses
 any other dependency's license. A project license should be chosen by its owner
 and reflected here when available. KaTeX's MIT license is installed separately.
 
+## CI validation
+
+After the Fedora formatting, workspace tests, Clippy and GTK smoke checks pass,
+CI builds the Arch package in an `archlinux:base-devel` container as an unprivileged
+user. It verifies `.SRCINFO`, builds and tests the exact CI commit (not a moving
+remote branch), and checks the installed payload and linked libraries. The
+resulting `.pkg.tar.zst` files are available as workflow artifacts for seven days.
+Pull requests get the same build checks.
+
 ## Maintaining metadata
 
 After changing `PKGBUILD`, regenerate the tracked metadata:
