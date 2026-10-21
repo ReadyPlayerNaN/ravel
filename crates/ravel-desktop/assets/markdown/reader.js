@@ -1,5 +1,20 @@
 "use strict";
 
+// Keep one index (and one tab order): open as a sidebar on wide viewports,
+// otherwise reset to a native, keyboard-operable disclosure above the article.
+const contents = document.querySelector(".contents-nav > .contents");
+if (contents) {
+    const wideContents = window.matchMedia("(min-width: 1000px)");
+    function updateContents() {
+        if (!wideContents.matches && contents.contains(document.activeElement)) {
+            contents.querySelector("summary").focus({preventScroll: true});
+        }
+        contents.open = wideContents.matches;
+    }
+    wideContents.addEventListener("change", updateContents);
+    updateContents();
+}
+
 // This is application code, never interpolated with document text. KaTeX's trust
 // mode stays disabled: TeX cannot create links, images, HTML or load resources.
 let mathBudget = 1024 * 1024;

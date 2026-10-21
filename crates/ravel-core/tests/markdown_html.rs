@@ -90,9 +90,18 @@ fn headings_have_unique_unicode_slugs_explicit_ids_and_a_contents_index() {
         assert!(html.contains(&format!("id=\"{id}\"")), "{html}");
         assert!(html.contains(&format!("href=\"#{id}\"")), "{html}");
     }
-    assert!(html.contains("<summary>Contents</summary>"));
+    assert!(html.starts_with("<div class=\"reader-layout has-contents\">"));
+    assert_eq!(html.matches("<nav ").count(), 1);
+    assert!(html.contains("<details class=\"contents\"><summary>Contents</summary>"));
     assert!(!html.contains("onclick="));
     assert!(!html.contains("class=\"ignored\""));
+}
+
+#[test]
+fn documents_without_headings_have_no_contents_or_sidebar_column() {
+    let html = render("A short document without headings.");
+    assert!(html.starts_with("<div class=\"reader-layout\"><article>"));
+    assert!(!html.contains("<nav "));
 }
 
 #[test]

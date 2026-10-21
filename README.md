@@ -220,8 +220,10 @@ Active or unsupported schemes such as `javascript:` are not clickable.
 Headings have automatic lowercase anchors (punctuation removed, spaces replaced
 with hyphens; repeated names get `-1`, `-2`, etc.). Unicode headings are supported.
 Use `[Section](#section)` for internal navigation, or `## Title {#custom}` for an
-explicit ID. The collapsible **Contents** index links to every heading. Navigation
-moves keyboard focus as well as scrolling. Footnotes use `[^name]` references and
+explicit ID. **Contents** links to every heading: a sticky left sidebar in wide
+viewports (1000 CSS pixels or more), or a collapsed, keyboard-operable disclosure
+above the text in smaller viewports. Resizing into the smaller layout collapses
+it again. Navigation moves keyboard focus as well as scrolling. Footnotes use `[^name]` references and
 `[^name]: ...` definitions, with formatted, multi-paragraph notes collected at the
 end and a separate return link for each reference.
 

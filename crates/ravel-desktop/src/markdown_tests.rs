@@ -39,6 +39,86 @@ fn ready(view: &webkit6::WebView) {
     });
 }
 
+fn responsive_contents(window: &adw::ApplicationWindow, view: &webkit6::WebView) {
+    fn resize(window: &adw::ApplicationWindow, width: i32) {
+        // Force the allocation even when Xvfb's screen is smaller than the viewport.
+        window.set_size_request(width, 740);
+        window.set_default_size(width, 740);
+    }
+    resize(window, 1200);
+    wait_for(|| {
+        eval(
+            view,
+            "innerWidth >= 1000 && document.querySelector('.contents').open",
+        )
+        .to_boolean()
+    });
+    assert!(eval(view, "document.querySelectorAll('.contents-nav').length === 1 && getComputedStyle(document.querySelector('.contents summary')).display === 'none'").to_boolean());
+    assert!(eval(view, "document.querySelector('.contents-nav').getBoundingClientRect().right < document.querySelector('article').getBoundingClientRect().left").to_boolean());
+    assert!(eval(view, "document.documentElement.scrollWidth <= innerWidth").to_boolean());
+    eval(view, "window.scrollTo(0, 400)");
+    wait_for(|| eval(view, "scrollY >= 400").to_boolean());
+    assert!(
+        eval(
+            view,
+            "Math.abs(document.querySelector('.contents-nav').getBoundingClientRect().top - 24) < 1"
+        )
+        .to_boolean()
+    );
+
+    resize(window, 800);
+    wait_for(|| {
+        eval(
+            view,
+            "innerWidth < 1000 && !document.querySelector('.contents').open",
+        )
+        .to_boolean()
+    });
+    eval(view, "window.scrollTo(0, 0)");
+    assert!(eval(view, "getComputedStyle(document.querySelector('.contents summary')).cursor === 'default' && getComputedStyle(document.querySelector('.contents summary')).display !== 'none'").to_boolean());
+    assert!(eval(view, "document.querySelector('.contents-nav').getBoundingClientRect().bottom <= document.querySelector('article').getBoundingClientRect().top").to_boolean());
+    assert!(eval(view, "document.documentElement.scrollWidth <= innerWidth").to_boolean());
+    eval(view, "document.querySelector('.contents summary').click()");
+    assert!(eval(view, "document.querySelector('.contents').open").to_boolean());
+    // Resizing within the narrow layout must not undo the user's expansion.
+    resize(window, 850);
+    wait_for(|| eval(view, "innerWidth > 800 && innerWidth < 1000").to_boolean());
+    assert!(eval(view, "document.querySelector('.contents').open").to_boolean());
+
+    resize(window, 1200);
+    wait_for(|| {
+        eval(
+            view,
+            "innerWidth >= 1000 && document.querySelector('.contents').open",
+        )
+        .to_boolean()
+    });
+    eval(view, "document.querySelector('.contents a').focus()");
+    resize(window, 800);
+    wait_for(|| {
+        eval(
+            view,
+            "innerWidth < 1000 && !document.querySelector('.contents').open",
+        )
+        .to_boolean()
+    });
+    assert!(
+        eval(
+            view,
+            "document.activeElement === document.querySelector('.contents summary')"
+        )
+        .to_boolean()
+    );
+    resize(window, 1100);
+    wait_for(|| {
+        eval(
+            view,
+            "innerWidth >= 1000 && document.querySelector('.contents').open",
+        )
+        .to_boolean()
+    });
+}
+
 pub(crate) fn run(app: &adw::Application) {
     let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
     let (window, viewer) = build(app);
@@ -105,6 +185,7 @@ pub(crate) fn run(app: &adw::Application) {
         .to_boolean()
     );
     wait_for(|| eval(view, "document.fonts.check('16px KaTeX_Main')").to_boolean());
+    responsive_contents(&window, view);
 
     // The contents index and footnotes use same-document navigation, including
     // focus movement and back-links for repeated references.
@@ -126,6 +207,8 @@ pub(crate) fn run(app: &adw::Application) {
     );
     wait_for(|| eval(view, "document.activeElement.id === 'ravel-ref-1-1'").to_boolean());
     assert!(eval(view, "document.querySelector('a[href=\"https://example.org\"]').href === 'https://example.org/'").to_boolean());
+
+    assert!(eval(view, "document.querySelector('article a[href=\"https://example.org/docs\"]').textContent === 'https://example.org/docs' && document.querySelector('article a[href=\"https://www.example.org\"]').textContent === 'www.example.org'").to_boolean());
 
     let styles = adw::StyleManager::default();
     let original_scheme = styles.color_scheme();

@@ -1,7 +1,9 @@
 :root { color-scheme: light; --bg: #ffffff; --fg: #202020; --muted: #636363; --line: #d7d7d7; --shade: #f4f4f4; --link: #1c71d8; }
 :root[data-theme="dark"] { color-scheme: dark; --bg: #242424; --fg: #eeeeec; --muted: #c0bfbc; --line: #505050; --shade: #303030; --link: #78aeed; }
 html { background: var(--bg); color: var(--fg); overflow-wrap: anywhere; }
-body { max-width: 960px; margin: auto; padding: 24px 32px 64px; font: 16px/1.6 sans-serif; }
+body { max-width: 1232px; margin: auto; padding: 24px 32px 64px; font: 16px/1.6 sans-serif; }
+.reader-layout { max-width: 960px; margin: auto; }
+article { min-width: 0; }
 a { color: var(--link); text-underline-offset: .15em; }
 a:focus-visible, summary:focus-visible, input:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
 h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin: 1.3em 0 .6em; scroll-margin-top: 24px; }
@@ -14,9 +16,17 @@ pre code { padding: 0; } hr { border: 0; border-top: 1px solid var(--line); marg
 ul, ol { padding-left: 2em; } li { margin: .25em 0; }
 input.task { accent-color: var(--link); width: 1.1em; height: 1.1em; vertical-align: middle; }
 .task-checked > input.task { opacity: .8; }
-.contents { background: var(--shade); border-radius: 8px; padding: 10px 16px; }
-.contents summary { cursor: pointer; font-weight: 600; }
-.contents ol { list-style: none; padding: 0; }
+.contents-nav { background: var(--shade); border-radius: 8px; padding: 10px 16px; }
+.contents-title { display: none; font-weight: 600; }
+.contents summary { cursor: default; font-weight: 600; }
+.contents ol { list-style: none; padding: 0; margin: .75em 0 0; }
+@media (min-width: 1000px) {
+    .reader-layout.has-contents { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 32px; max-width: none; align-items: start; }
+    .contents-nav { position: sticky; top: 24px; max-height: calc(100vh - 48px); overflow: auto; box-sizing: border-box; background: none; border-radius: 0; border-right: 1px solid var(--line); padding: 0 16px 0 0; font-size: 14px; }
+    .contents-title { display: block; }
+    .contents summary { display: none; }
+    article > :first-child { margin-top: 0; }
+}
 .toc-level-2 { margin-left: 1em; } .toc-level-3 { margin-left: 2em; } .toc-level-4 { margin-left: 3em; } .toc-level-5 { margin-left: 4em; } .toc-level-6 { margin-left: 5em; }
 .table-scroll { overflow-x: auto; } table { border-collapse: collapse; }
 th, td { border: 1px solid var(--line); padding: 8px 14px; } th { background: var(--shade); }

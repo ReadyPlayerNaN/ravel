@@ -38,9 +38,13 @@ pub(super) fn render(source: &str) -> Result<(String, Vec<String>)> {
     let mut renderer = Renderer::new(&events);
     renderer.events(&events)?;
     renderer.footnotes(&events)?;
-    let mut result = String::new();
+    let mut result = String::from(if renderer.headings.is_empty() {
+        "<div class=\"reader-layout\">"
+    } else {
+        "<div class=\"reader-layout has-contents\">"
+    });
     if !renderer.headings.is_empty() {
-        result.push_str("<nav aria-label=\"Table of contents\"><details class=\"contents\"><summary>Contents</summary><ol>");
+        result.push_str("<nav class=\"contents-nav\" aria-label=\"Table of contents\"><div class=\"contents-title\" aria-hidden=\"true\">Contents</div><details class=\"contents\"><summary>Contents</summary><ol>");
         for (level, id, title) in &renderer.headings {
             result.push_str(&format!(
                 "<li class=\"toc-level-{level}\"><a href=\"#{}\">{}</a></li>",
@@ -52,7 +56,7 @@ pub(super) fn render(source: &str) -> Result<(String, Vec<String>)> {
     }
     result.push_str("<article>");
     result.push_str(&renderer.output);
-    result.push_str("</article>");
+    result.push_str("</article></div>");
     check_size(&result)?;
     Ok((result, renderer.media_sources.into_iter().collect()))
 }
