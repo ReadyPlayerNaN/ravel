@@ -62,6 +62,12 @@ Debian/Ubuntu package names are `build-essential`, `pkg-config`, `libgtk-4-dev`
 `gstreamer1.0-plugins-base`, `gstreamer1.0-plugins-good` and `jq`; check the versions above, since
 older releases such as Ubuntu 24.04 ship an insufficient Libadwaita version.
 
+## Arch Linux package
+
+The [`ravel-git` package recipe](packaging/aur/README.md) builds from `master`
+and installs the desktop entry and release binary. See its documentation for
+local builds and AUR maintenance.
+
 ## Run
 
 ```sh
