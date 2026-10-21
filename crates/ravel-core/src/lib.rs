@@ -1,4 +1,5 @@
 //! GTK-independent parsing and structural search for JSON and YAML documents.
+//! The separate [`markdown`] module provides safe formatted Markdown presentation.
 //!
 //! YAML is normalized to JSON-compatible values. Multi-document YAML streams
 //! become synthetic arrays. Original YAML source is retained separately for raw
@@ -13,6 +14,7 @@ use std::sync::Arc;
 use serde_json::Value;
 use thiserror::Error;
 
+pub mod markdown;
 mod yaml;
 mod yaml_value;
 
