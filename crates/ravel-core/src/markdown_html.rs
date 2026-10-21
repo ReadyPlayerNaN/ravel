@@ -1,11 +1,12 @@
 //! Generated markup only: source HTML and every attribute value are escaped.
 
+use std::borrow::Cow;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::ops::Range;
 
 use linkify::{LinkFinder, LinkKind};
 use pulldown_cmark::{
-    Alignment, CodeBlockKind, Event, Options, Parser, Tag, TagEnd, TextMergeStream,
+    Alignment, CodeBlockKind, Event, LinkType, Options, Parser, Tag, TagEnd, TextMergeStream,
 };
 
 use super::{MAX_EVENTS, MAX_NESTING, MAX_RENDERED_BYTES, MarkdownError};
@@ -115,6 +116,68 @@ fn allowed_destination(destination: &str, media: bool) -> bool {
     }
 }
 
+fn automatic_link(text: &str, link: &linkify::Link<'_>) -> Option<(Range<usize>, String)> {
+    let mut range = link.start()..link.end();
+    let url = link.as_str();
+    let destination = if *link.kind() == LinkKind::Email {
+        let mailto_start = range.start.checked_sub("mailto:".len()).filter(|&start| {
+            text.get(start..range.start)
+                .is_some_and(|s| s.eq_ignore_ascii_case("mailto:"))
+                && !text[..start]
+                    .ends_with(|c: char| c.is_alphanumeric() || matches!(c, '+' | '-' | '.' | '_'))
+        });
+        if let Some(start) = mailto_start {
+            range.start = start;
+            if text[range.end..].starts_with('?') {
+                // URI query values should percent-encode spaces and delimiters.
+                // Include the query in the link, but not surrounding prose.
+                let query = text[range.end..]
+                    .split(|c: char| {
+                        c.is_whitespace()
+                            || matches!(
+                                c,
+                                '<' | '>' | '\"' | '\'' | '`' | '(' | ')' | '[' | ']' | '{' | '}'
+                            )
+                    })
+                    .next()
+                    .unwrap_or("")
+                    .trim_end_matches(['.', ',', ';', '!', '?']);
+                range.end += query.len();
+            }
+            text[range.clone()].to_owned()
+        } else {
+            mailto_address(url)
+        }
+    } else if url.get(..4).is_some_and(|s| s.eq_ignore_ascii_case("www.")) {
+        format!("https://{url}")
+    } else if url.split_once("://").is_some_and(|(scheme, _)| {
+        scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https")
+    }) {
+        url.to_owned()
+    } else {
+        return None;
+    };
+    Some((range, destination))
+}
+
+fn mailto_address(address: &str) -> String {
+    let mut destination = String::from("mailto:");
+    for c in address.chars() {
+        // These are legal in a bare address's local part, but must not
+        // become URI queries, fragments or percent escapes.
+        match c {
+            '%' => destination.push_str("%25"),
+            '?' => destination.push_str("%3F"),
+            '#' => destination.push_str("%23"),
+            '&' => destination.push_str("%26"),
+            '=' => destination.push_str("%3D"),
+            '/' => destination.push_str("%2F"),
+            _ => destination.push(c),
+        }
+    }
+    destination
+}
+
 struct Note {
     number: usize,
     references: usize,
@@ -133,6 +196,7 @@ struct Renderer {
     note_order: Vec<String>,
     links: Vec<bool>,
     link_finder: LinkFinder,
+    domain_finder: LinkFinder,
     in_code_block: bool,
     table_alignments: Vec<Alignment>,
     table_head: bool,
@@ -143,7 +207,7 @@ impl Renderer {
     fn new(events: &[Event<'_>]) -> Self {
         let mut renderer = Self::default();
         renderer
-            .link_finder
+            .domain_finder
             .kinds(&[LinkKind::Url])
             .url_must_have_scheme(false);
         for event in events {
@@ -285,30 +349,36 @@ impl Renderer {
             self.output.push_str(&escape(text));
             return check_size(&self.output);
         }
+        // Scan schemeless domains separately: otherwise a dotted email local
+        // part can be consumed as a domain before the email scanner sees it.
+        let mut links = self.link_finder.links(text).peekable();
+        let mut domains = self.domain_finder.links(text).peekable();
+        let ordered = std::iter::from_fn(|| match (links.peek(), domains.peek()) {
+            (Some(link), Some(domain)) if domain.start() < link.start() => domains.next(),
+            (Some(_), _) => links.next(),
+            (None, _) => domains.next(),
+        });
         let mut end = 0;
-        for link in self.link_finder.links(text) {
-            let url = link.as_str();
-            let prefix = if url.get(..4).is_some_and(|s| s.eq_ignore_ascii_case("www.")) {
-                "https://"
-            } else if url.split_once("://").is_some_and(|(scheme, _)| {
-                scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https")
-            }) {
-                ""
-            } else {
+        for link in ordered {
+            // A mailto query may contain another address already included in
+            // the previous link (for example its cc parameter).
+            if link.start() < end {
+                continue;
+            }
+            let Some((range, destination)) = automatic_link(text, &link) else {
                 continue;
             };
-            let destination = format!("{prefix}{url}");
             if !allowed_destination(&destination, false) {
                 continue;
             }
-            self.output.push_str(&escape(&text[end..link.start()]));
+            self.output.push_str(&escape(&text[end..range.start]));
             self.output.push_str(&format!(
                 "<a href=\"{}\" rel=\"noreferrer noopener\">{}</a>",
                 escape(&destination),
-                escape(url)
+                escape(&text[range.clone()])
             ));
             check_size(&self.output)?;
-            end = link.end();
+            end = range.end;
         }
         self.output.push_str(&escape(&text[end..]));
         check_size(&self.output)
@@ -335,14 +405,22 @@ impl Renderer {
             Tag::Strong => self.output.push_str("<strong>"),
             Tag::Strikethrough => self.output.push_str("<del>"),
             Tag::Link {
-                dest_url, title, ..
+                link_type,
+                dest_url,
+                title,
+                ..
             } => {
-                let allowed = allowed_destination(dest_url, false);
+                let dest_url = if *link_type == LinkType::Email {
+                    Cow::Owned(mailto_address(dest_url))
+                } else {
+                    Cow::Borrowed(dest_url.as_ref())
+                };
+                let allowed = allowed_destination(&dest_url, false);
                 self.links.push(allowed);
                 if allowed {
                     self.output.push_str(&format!(
                         "<a href=\"{}\" title=\"{}\" rel=\"noreferrer noopener\">",
-                        escape(dest_url),
+                        escape(&dest_url),
                         escape(title)
                     ));
                 } else {

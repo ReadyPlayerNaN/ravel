@@ -210,8 +210,10 @@ the application's light/dark theme.
 ### Links, headings and footnotes
 
 Normal, reference-style and autolink hyperlinks are clickable and keyboard
-focusable. Bare `http://`, `https://` and `www.` URLs in prose also become links
-(`www.` uses HTTPS); code, literal HTML and existing link labels are left alone.
+focusable. Bare `http://`, `https://` and `www.` URLs, `mailto:user@example.org`
+URIs and email addresses such as `user@example.org` in prose also become links
+(`www.` uses HTTPS). Mailto query parameters such as `?subject=Hello%20there`
+are preserved. Code, literal HTML and existing link labels are left alone.
 HTTP(S) and email links open in the system browser/mail application;
 local file links use an application chooser rather than silently launching files.
 Relative destinations resolve against the Markdown file, not the working directory.

@@ -57,6 +57,76 @@ fn bare_url_entities_are_merged_and_escaped_without_changing_source() {
 }
 
 #[test]
+fn bare_email_addresses_and_mailto_uris_become_links() {
+    let html = render(
+        "Email (first.last+tag@example.org), mailto:help@example.org or MAILTO:Team@example.org.",
+    );
+    for (label, href) in [
+        (
+            "first.last+tag@example.org",
+            "mailto:first.last+tag@example.org",
+        ),
+        ("mailto:help@example.org", "mailto:help@example.org"),
+        ("MAILTO:Team@example.org", "MAILTO:Team@example.org"),
+    ] {
+        assert!(
+            html.contains(&format!(
+                "<a href=\"{href}\" rel=\"noreferrer noopener\">{label}</a>"
+            )),
+            "{html}"
+        );
+    }
+    assert!(html.contains("</a>),"), "{html}");
+    assert!(html.contains("Team@example.org</a>."), "{html}");
+}
+
+#[test]
+fn mailto_queries_preserve_headers_and_do_not_create_nested_links() {
+    let source = "Write (mailto:help@example.org?subject=Hello%20there&amp;cc=team@example.org), then other@example.org.";
+    let document = Markdown::parse(source.as_bytes()).unwrap();
+    let html = document.html();
+    assert!(
+        html.contains(
+            "href=\"mailto:help@example.org?subject=Hello%20there&amp;cc=team@example.org\""
+        ),
+        "{html}"
+    );
+    assert_eq!(html.matches("<a ").count(), 2, "{html}");
+    assert!(html.contains("team@example.org</a>),"), "{html}");
+    assert_eq!(document.source(), source);
+}
+
+#[test]
+fn bare_email_local_parts_do_not_turn_into_uri_queries_or_fragments() {
+    let html = render(
+        "tag?value@example.org tag#value@example.org tag%20value@example.org a&b@example.org www.user@example.org",
+    );
+    for address in [
+        "tag%3Fvalue",
+        "tag%23value",
+        "tag%2520value",
+        "a%26b",
+        "www.user",
+    ] {
+        assert!(
+            html.contains(&format!("href=\"mailto:{address}@example.org\"")),
+            "{html}"
+        );
+    }
+    assert!(html.contains(">a&amp;b@example.org</a>"), "{html}");
+}
+
+#[test]
+fn email_detection_leaves_literal_content_and_existing_link_labels_unchanged() {
+    let html = render(
+        "`code@example.org`\n\n```\nmailto:code@example.org\n```\n\n<div>html@example.org</div>\n\n$math@example.org$\n\n![alt@example.org](image.png)\n\n[label@example.org](mailto:target@example.org) [blocked@example.org](javascript:evil) <already@example.org>",
+    );
+    assert_eq!(html.matches("<a ").count(), 2, "{html}");
+    assert!(html.contains("href=\"mailto:target@example.org\""));
+    assert!(html.contains("href=\"mailto:already@example.org\""));
+}
+
+#[test]
 fn bare_urls_leave_code_html_math_images_and_existing_links_alone() {
     let html = render(
         "`https://inline.example.org`\n\n```\nhttps://fenced.example.org\n```\n\n    https://indented.example.org\n\n<div>https://html.example.org</div>\n\n<span title=\"https://attribute.example.org\">literal</span>\n\n$https://math.example.org$\n\n![https://alt.example.org](image.png)\n\n[https://label.example.org](https://destination.example.org)\n\n[https://blocked.example.org](javascript:evil)\n\n<https://autolink.example.org>",

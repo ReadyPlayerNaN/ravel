@@ -210,6 +210,8 @@ pub(crate) fn run(app: &adw::Application) {
 
     assert!(eval(view, "document.querySelector('article a[href=\"https://example.org/docs\"]').textContent === 'https://example.org/docs' && document.querySelector('article a[href=\"https://www.example.org\"]').textContent === 'www.example.org'").to_boolean());
 
+    assert!(eval(view, "document.querySelector('article a[href=\"mailto:hello@example.org\"]').textContent === 'hello@example.org' && document.querySelector('article a[href=\"mailto:hello@example.org?subject=Hello%20Ravel\"]').textContent === 'mailto:hello@example.org?subject=Hello%20Ravel'").to_boolean());
+
     let styles = adw::StyleManager::default();
     let original_scheme = styles.color_scheme();
     styles.set_color_scheme(adw::ColorScheme::ForceLight);

@@ -37,6 +37,7 @@ fn main() {
 
 [Example link](https://example.org) opens in your browser.
 Bare URLs work too: https://example.org/docs and www.example.org.
+Email links work too: hello@example.org and mailto:hello@example.org?subject=Hello%20Ravel.
 [Back to the lists](#lists-and-quotes) navigates inside this document.
 
 ![Ravel diagram](media/ravel.svg "Local SVG image")
