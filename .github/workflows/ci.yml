@@ -66,11 +66,9 @@ jobs:
           actionlint
           shellcheck scripts/ci/*.sh
           bash scripts/ci/test-publish-aur.sh
+          bash scripts/ci/test-run-arch-build.sh
       - name: Build and check the tested commit as an Arch package
-        run: |
-          chown -R builder:builder "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
-          sudo -u builder --preserve-env=GITHUB_SHA,CARGO_BUILD_JOBS \
-            bash scripts/ci/build-arch-package.sh "$RUNNER_TEMP/ravel-package"
+        run: bash scripts/ci/run-arch-build.sh
       - uses: actions/upload-artifact@v4
         with:
           name: ravel-git-arch-${{ github.sha }}

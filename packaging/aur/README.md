@@ -28,7 +28,10 @@ and reflected here when available. KaTeX's MIT license is installed separately.
 
 After the Fedora formatting, workspace tests, Clippy and GTK smoke checks pass,
 CI builds the Arch package in an `archlinux:base-devel` container as an unprivileged
-user. It verifies `.SRCINFO`, builds and tests the exact CI commit (not a moving
+user in a disposable clone. Only that clone and the package output directory
+change ownership; the original checkout and GitHub runner metadata stay untouched.
+Artifact ownership is restored to the host runner on success or failure.
+It verifies `.SRCINFO`, builds and tests the exact CI commit (not a moving
 remote branch), and checks the installed payload and linked libraries. The
 resulting `.pkg.tar.zst` files are available as workflow artifacts for seven days.
 Pull requests get the same build checks.
