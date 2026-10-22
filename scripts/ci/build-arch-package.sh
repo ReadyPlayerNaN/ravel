@@ -32,6 +32,7 @@ mkdir payload
 bsdtar -xf "$package" -C payload
 test -x payload/usr/bin/ravel
 test -s payload/usr/share/licenses/ravel-git/KaTeX-LICENSE
+test -s payload/usr/share/licenses/ravel-git/Highlight.js-LICENSE
 desktop-file-validate payload/usr/share/applications/global.zak.ravel.desktop
 ldd payload/usr/bin/ravel > linked-libraries.txt
 if grep -F 'not found' linked-libraries.txt; then

@@ -17,7 +17,7 @@ recipe. Build metadata (`v1.2.3+build.4`) is preserved in the release URL and as
 name but is not part of Arch's numeric `pkgver`.
 
 The archive contains the executable, desktop entry, README and bundled KaTeX
-license. As with `ravel-git`, the project's own license is currently undeclared
+and Highlight.js licenses. As with `ravel-git`, the project's own license is currently undeclared
 (`LicenseRef-unknown`), not inferred from dependency licenses.
 
 ## Publishing a release

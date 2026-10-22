@@ -2,7 +2,7 @@
 
 `PKGBUILD` builds `ravel-git` from upstream `master`, with a commit-count-based
 `pkgver()`. It installs the release binary, desktop entry, documentation, and
-bundled KaTeX license. It conflicts with/provides `ravel`.
+bundled KaTeX and Highlight.js licenses. It conflicts with/provides `ravel`.
 
 ## Local build
 
@@ -22,7 +22,7 @@ Extra GStreamer codecs and `jq` are optional runtime dependencies.
 The project currently has **no declared license**. The metadata therefore uses
 `LicenseRef-unknown`; it does not imply permission to redistribute under MIT or
 any other dependency's license. A project license should be chosen by its owner
-and reflected here when available. KaTeX's MIT license is installed separately.
+and reflected here when available. KaTeX's MIT and Highlight.js's BSD-3-Clause licenses are installed separately.
 
 ## CI validation
 

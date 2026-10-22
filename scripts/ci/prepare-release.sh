@@ -20,6 +20,8 @@ install -Dm644 payload/usr/share/applications/global.zak.ravel.desktop \
 install -Dm644 payload/usr/share/doc/ravel-git/README.md bundle/share/doc/ravel/README.md
 install -Dm644 payload/usr/share/licenses/ravel-git/KaTeX-LICENSE \
     bundle/share/licenses/ravel/KaTeX-LICENSE
+install -Dm644 payload/usr/share/licenses/ravel-git/Highlight.js-LICENSE \
+    bundle/share/licenses/ravel/Highlight.js-LICENSE
 
 tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owner \
     -C bundle -cf - bin share | gzip -n > "$output/$asset"
@@ -41,4 +43,5 @@ if [[ -d "$output/aur" ]]; then
     cmp "$work/bundle/bin/ravel" "$work/installed/usr/bin/ravel"
     desktop-file-validate "$work/installed/usr/share/applications/global.zak.ravel.desktop"
     test -s "$work/installed/usr/share/licenses/ravel-bin/KaTeX-LICENSE"
+    test -s "$work/installed/usr/share/licenses/ravel-bin/Highlight.js-LICENSE"
 fi

@@ -8,6 +8,9 @@ use std::{
     time::Duration,
 };
 
+#[path = "markdown_code_tests.rs"]
+mod code_tests;
+
 use super::build;
 use crate::ui_tests::{find, wait_for};
 use gtk::{gio, glib};
@@ -120,6 +123,7 @@ fn responsive_contents(window: &adw::ApplicationWindow, view: &webkit6::WebView)
 }
 
 pub(crate) fn run(app: &adw::Application) {
+    code_tests::run(app);
     let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
     let (window, viewer) = build(app);
     window.present();

@@ -166,7 +166,7 @@ impl MarkdownView {
             "light"
         };
         let html = format!(
-            "<!doctype html><html data-theme=\"{theme}\"><head><meta charset=\"utf-8\"><meta http-equiv=\"Content-Security-Policy\" content=\"{CSP}\"><meta name=\"referrer\" content=\"no-referrer\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><link rel=\"stylesheet\" href=\"ravel-assets:///katex/katex.min.css\"><link rel=\"stylesheet\" href=\"ravel-assets:///reader.css\"></head><body>{}<script src=\"ravel-assets:///katex/katex.min.js\"></script><script src=\"ravel-assets:///reader.js\"></script></body></html>",
+            "<!doctype html><html data-theme=\"{theme}\"><head><meta charset=\"utf-8\"><meta http-equiv=\"Content-Security-Policy\" content=\"{CSP}\"><meta name=\"referrer\" content=\"no-referrer\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><link rel=\"stylesheet\" href=\"ravel-assets:///katex/katex.min.css\"><link rel=\"stylesheet\" href=\"ravel-assets:///reader.css\"></head><body>{}<script src=\"ravel-assets:///katex/katex.min.js\"></script><script src=\"ravel-assets:///highlight/highlight.min.js\"></script><script src=\"ravel-assets:///reader.js\"></script></body></html>",
             document.html()
         );
         view.load_html(&html, Some(&uri));

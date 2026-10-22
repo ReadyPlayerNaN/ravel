@@ -15,6 +15,30 @@ if (contents) {
     updateContents();
 }
 
+// Only explicitly tagged blocks use bundled grammars: no auto-detection, dynamic
+// imports, or evaluation of the document's code. Oversized/unknown blocks remain
+// plain text. Bound both per-block and total work on untrusted documents.
+if (typeof hljs !== "undefined") {
+    const encoder = new TextEncoder();
+    let codeBudget = 128 * 1024;
+    let blockBudget = 128;
+    for (const node of document.querySelectorAll("pre > code[data-language]")) {
+        const language = node.dataset.language.toLowerCase();
+        if (!/^[a-z0-9_+#.-]{1,64}$/.test(language) || !hljs.getLanguage(language)) continue;
+        const source = node.textContent;
+        if (source.length > 16384) continue;
+        const bytes = encoder.encode(source).length;
+        if (bytes > 16384 || bytes > codeBudget || blockBudget <= 0) continue;
+        codeBudget -= bytes;
+        blockBudget--;
+        try {
+            // Highlight.js escapes source text; only its generated token spans
+            // become markup. Source Markdown and copied code remain unchanged.
+            node.innerHTML = hljs.highlight(source, {language, ignoreIllegals: true}).value;
+        } catch (_) { /* A failed grammar must never prevent document viewing. */ }
+    }
+}
+
 // This is application code, never interpolated with document text. KaTeX's trust
 // mode stays disabled: TeX cannot create links, images, HTML or load resources.
 let mathBudget = 1024 * 1024;

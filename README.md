@@ -254,6 +254,28 @@ it again. Navigation moves keyboard focus as well as scrolling. Footnotes use `[
 `[^name]: ...` definitions, with formatted, multi-paragraph notes collected at the
 end and a separate return link for each reference.
 
+### Code blocks
+
+Fenced code blocks with a language after the opening backticks have syntax colors:
+
+````markdown
+```javascript
+const greeting = "Hello, Markdown!";
+console.log(greeting);
+```
+````
+
+Highlighting uses bundled **Highlight.js 11.11.1**, works offline, and follows the
+light/dark theme. Common languages include JavaScript (`js`), TypeScript (`ts`),
+Rust, Python, JSON, YAML, Bash, SQL, CSS and HTML. Language names are
+case-insensitive; the first word of the fence info string selects the language.
+See the [bundled grammar list](crates/ravel-desktop/assets/markdown/highlight/README.md).
+Inline code, untagged fences, and unknown languages remain plain. For bounded
+rendering work, highlighting stops at 16 KiB per block, 128 KiB total code, or 128
+blocks; skipped blocks still display in full. Code is never executed, and its
+whitespace, copied text and original Markdown stay unchanged. Long code lines
+scroll within their block rather than widening the page.
+
 ### Images, audio and video
 
 Images render inline, including PNG, JPEG, GIF, WebP, SVG and other formats

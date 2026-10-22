@@ -391,9 +391,14 @@ impl Renderer {
             Tag::CodeBlock(kind) => {
                 self.in_code_block = true;
                 self.output.push_str("<pre><code");
-                if let CodeBlockKind::Fenced(language) = kind {
-                    self.output
-                        .push_str(&format!(" title=\"{}\"", escape(language)));
+                if let CodeBlockKind::Fenced(info) = kind
+                    && let Some(language) = info.split_whitespace().next()
+                {
+                    self.output.push_str(&format!(
+                        " data-language=\"{}\" title=\"{}\"",
+                        escape(language),
+                        escape(info)
+                    ));
                 }
                 self.output.push('>');
             }

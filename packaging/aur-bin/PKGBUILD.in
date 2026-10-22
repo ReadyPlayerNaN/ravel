@@ -26,4 +26,6 @@ package() {
         "$pkgdir/usr/share/doc/$pkgname/README.md"
     install -Dm644 "$srcdir/share/licenses/ravel/KaTeX-LICENSE" \
         "$pkgdir/usr/share/licenses/$pkgname/KaTeX-LICENSE"
+    install -Dm644 "$srcdir/share/licenses/ravel/Highlight.js-LICENSE" \
+        "$pkgdir/usr/share/licenses/$pkgname/Highlight.js-LICENSE"
 }

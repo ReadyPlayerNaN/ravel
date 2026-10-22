@@ -8,6 +8,36 @@ fn render(source: &str) -> String {
 }
 
 #[test]
+fn fenced_code_exposes_language_without_changing_literal_content() {
+    let source = "```javascript extra-info\nconst html = '<script>evil()</script>';\n```\n";
+    let document = Markdown::parse(source.as_bytes()).unwrap();
+    assert!(document.html().contains(
+        "<pre><code data-language=\"javascript\" title=\"javascript extra-info\">const html = &#39;&lt;script&gt;evil()&lt;/script&gt;&#39;;\n</code></pre>"
+    ), "{}", document.html());
+    assert_eq!(document.source(), source);
+}
+
+#[test]
+fn code_language_metadata_is_escaped_and_never_executable() {
+    let html = render("```js\" onclick=\"evil()\n<svg onload=evil()>\n```\n");
+    assert!(html.contains("data-language=\"js&quot;\""), "{html}");
+    assert!(!html.contains(" onclick=\""), "{html}");
+    assert!(html.contains("&lt;svg onload=evil()&gt;"), "{html}");
+}
+
+#[test]
+fn inline_untagged_and_indented_code_have_no_language_metadata() {
+    let html = render("`inline` and ```also inline```\n\n```\nplain\n```\n\n    indented\n");
+    assert!(!html.contains("data-language="), "{html}");
+    assert!(html.contains("<code>also inline</code>"), "{html}");
+    assert!(html.contains("<pre><code>plain\n</code></pre>"), "{html}");
+    assert!(
+        html.contains("<pre><code>indented\n</code></pre>"),
+        "{html}"
+    );
+}
+
+#[test]
 fn links_are_clickable_but_active_schemes_are_blocked() {
     let html = render(
         "[web](https://example.org/?a=1&b=2) [mail](mailto:a@example.org) [relative](other.md#title) [bad](javascript:alert%281%29) [data](data:text/html,evil)",
