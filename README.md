@@ -267,6 +267,10 @@ console.log(greeting);
 ```
 ````
 
+Each code block has a compact language header, defaulting to `text` for untagged
+fences and indented code. The header stays above the code when scrolling long
+lines and is separate from code selection/copying.
+
 Highlighting uses bundled **Highlight.js 11.11.1**, works offline, and follows the
 light/dark theme. Common languages include JavaScript (`js`), TypeScript (`ts`),
 Rust, Python, JSON, YAML, Bash, SQL, CSS and HTML. Language names are

@@ -22,6 +22,10 @@ fn code_language_metadata_is_escaped_and_never_executable() {
     let html = render("```js\" onclick=\"evil()\n<svg onload=evil()>\n```\n");
     assert!(html.contains("data-language=\"js&quot;\""), "{html}");
     assert!(!html.contains(" onclick=\""), "{html}");
+    assert!(
+        html.contains("class=\"code-language\">js&quot;</div>"),
+        "{html}"
+    );
     assert!(html.contains("&lt;svg onload=evil()&gt;"), "{html}");
 }
 
@@ -35,6 +39,36 @@ fn inline_untagged_and_indented_code_have_no_language_metadata() {
         html.contains("<pre><code>indented\n</code></pre>"),
         "{html}"
     );
+}
+
+#[test]
+fn code_block_headers_show_the_language_or_default_to_text() {
+    let html = render(
+        "```javascript extra-info\nconst value = 1;\n```\n\n~~~unknown-language\nplain\n~~~\n\n```\nuntagged\n```\n\n    indented\n",
+    );
+    assert!(
+        html.contains("<div class=\"code-language\">javascript</div><pre>"),
+        "{html}"
+    );
+    assert!(
+        html.contains("<div class=\"code-language\">unknown-language</div><pre>"),
+        "{html}"
+    );
+    assert_eq!(
+        html.matches("<div class=\"code-language\">text</div><pre>")
+            .count(),
+        2
+    );
+    assert_eq!(html.matches("<div class=\"code-block\">").count(), 4);
+    assert_eq!(html.matches("</code></pre></div>").count(), 4);
+}
+
+#[test]
+fn inline_code_and_literal_html_do_not_get_code_block_headers() {
+    let html = render("`inline` and ```also inline```\n\n<div>literal</div>\n");
+    assert!(!html.contains("class=\"code-language\""), "{html}");
+    assert!(html.contains("<code>also inline</code>"), "{html}");
+    assert!(html.contains("<pre class=\"literal-html\">"), "{html}");
 }
 
 #[test]

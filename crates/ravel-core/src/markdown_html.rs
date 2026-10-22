@@ -390,10 +390,16 @@ impl Renderer {
             Tag::BlockQuote(_) => self.output.push_str("<blockquote>"),
             Tag::CodeBlock(kind) => {
                 self.in_code_block = true;
-                self.output.push_str("<pre><code");
-                if let CodeBlockKind::Fenced(info) = kind
-                    && let Some(language) = info.split_whitespace().next()
-                {
+                let info = match kind {
+                    CodeBlockKind::Fenced(info) => Some(info.as_ref()),
+                    CodeBlockKind::Indented => None,
+                };
+                let language = info.and_then(|info| info.split_whitespace().next());
+                self.output.push_str(&format!(
+                    "<div class=\"code-block\"><div class=\"code-language\">{}</div><pre><code",
+                    escape(language.unwrap_or("text"))
+                ));
+                if let (Some(info), Some(language)) = (info, language) {
                     self.output.push_str(&format!(
                         " data-language=\"{}\" title=\"{}\"",
                         escape(language),
@@ -472,7 +478,7 @@ impl Renderer {
             TagEnd::BlockQuote(_) => "</blockquote>\n",
             TagEnd::CodeBlock => {
                 self.in_code_block = false;
-                "</code></pre>\n"
+                "</code></pre></div>\n"
             }
             TagEnd::HtmlBlock => "</pre>\n",
             TagEnd::List(true) => "</ol>\n",

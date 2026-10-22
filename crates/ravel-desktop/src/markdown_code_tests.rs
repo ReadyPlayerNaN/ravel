@@ -16,6 +16,9 @@ pub(super) fn run(app: &adw::Application) {
     wait_for(|| !viewer.spinner.is_spinning());
     let view = viewer.markdown.view().unwrap();
     ready(&view);
+    assert_eq!(eval(&view, "JSON.stringify(Array.from(document.querySelectorAll('.code-language'), n => n.textContent))").to_string(), r#"["javascript","JS","json","rust","html","not-a-language","text","text"]"#);
+    assert!(eval(&view, "Array.from(document.querySelectorAll('pre > code')).every(c => c.parentElement.previousElementSibling.classList.contains('code-language')) && !document.querySelector('p .code-language, pre .code-language')").to_boolean());
+    assert!(eval(&view, "document.querySelector('.code-language').getBoundingClientRect().bottom <= document.querySelector('pre').getBoundingClientRect().top && parseFloat(getComputedStyle(document.querySelector('.code-language')).fontSize) < parseFloat(getComputedStyle(document.querySelector('pre')).fontSize)").to_boolean());
     assert!(eval(&view, "document.querySelector('code[data-language=javascript] .hljs-keyword').textContent === 'const'").to_boolean());
     assert!(eval(&view, "document.querySelector('code[data-language=javascript] .hljs-string').textContent === '\"Hello, Markdown!\"'").to_boolean());
     for language in ["JS", "json", "rust", "html"] {
@@ -72,6 +75,11 @@ pub(super) fn run(app: &adw::Application) {
     )
     .to_string();
     assert!(eval(&view, "getComputedStyle(document.querySelector('pre .hljs-keyword')).color !== getComputedStyle(document.querySelector('pre code')).color").to_boolean());
+    let light_header = eval(
+        &view,
+        "getComputedStyle(document.querySelector('.code-language')).color",
+    )
+    .to_string();
     styles.set_color_scheme(adw::ColorScheme::ForceDark);
     wait_for(|| eval(&view, "document.documentElement.dataset.theme === 'dark'").to_boolean());
     assert_ne!(
@@ -83,6 +91,14 @@ pub(super) fn run(app: &adw::Application) {
         .to_string()
     );
     assert!(eval(&view, "getComputedStyle(document.querySelector('pre .hljs-keyword')).color !== getComputedStyle(document.querySelector('pre code')).color").to_boolean());
+    assert_ne!(
+        light_header,
+        eval(
+            &view,
+            "getComputedStyle(document.querySelector('.code-language')).color"
+        )
+        .to_string()
+    );
     styles.set_color_scheme(original);
     assert_eq!(std::fs::read_to_string(&path).unwrap(), source);
     let raw = viewer.text.buffer();
@@ -107,6 +123,8 @@ pub(super) fn run(app: &adw::Application) {
     assert!(eval(&view, "!document.querySelector('pre code').children.length && document.querySelectorAll('pre code')[1].querySelector('.hljs-keyword') !== null && !document.querySelectorAll('pre code')[20].children.length").to_boolean());
     // A long, unwrapped code line scrolls inside the block, not the whole page.
     assert!(eval(&view, "document.querySelector('pre').scrollWidth > document.querySelector('pre').clientWidth && document.documentElement.scrollWidth <= innerWidth").to_boolean());
+
+    assert!(eval(&view, "(() => { const header = document.querySelector('.code-language'); const left = header.getBoundingClientRect().left; document.querySelector('pre').scrollLeft = 100; return document.querySelector('pre').scrollLeft > 0 && header.getBoundingClientRect().left === left; })()").to_boolean());
 
     let many = "```js\nconst tiny = 1;\n```\n\n".repeat(130);
     viewer

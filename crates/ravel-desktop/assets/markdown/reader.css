@@ -13,6 +13,9 @@ blockquote { border-left: 4px solid var(--line); margin-left: 0; padding-left: 2
 code, pre { font-family: monospace; background: var(--shade); border-radius: 5px; }
 code { padding: .1em .25em; } pre { padding: 14px; overflow: auto; overflow-wrap: normal; }
 pre code { padding: 0; background: transparent; }
+.code-block { margin: 1em 0; min-width: 0; background: var(--shade); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.code-language { padding: 5px 14px; color: var(--muted); border-bottom: 1px solid var(--line); font: 600 12px/1.5 sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: none; }
+.code-block > pre { margin: 0; border-radius: 0; background: transparent; }
 /* Token colors apply only inside blocks; inline code remains a single style. */
 :root { --code-keyword: #813d9c; --code-string: #216b32; --code-number: #9c4100; --code-name: #185da5; --code-comment: #636363; }
 :root[data-theme="dark"] { --code-keyword: #dc8add; --code-string: #8bd49c; --code-number: #ffb86c; --code-name: #82b9f7; --code-comment: #b0afac; }
