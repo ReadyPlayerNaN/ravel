@@ -6,7 +6,28 @@ header button to switch to the original raw JSON without losing expanded nodes.
 ```json
 {
   "name": "Ravel",
-  "users": [{"name": "Alice", "active": true}, {"name": "Bob", "active": false}],
+  "users": [
+    {
+      "name": "Alice",
+      "active": true,
+      "id": 1,
+      "role": "admin",
+      "email": "alice@example.org",
+      "team": "Design",
+      "location": "London",
+      "timezone": "Europe/London"
+    },
+    {
+      "name": "Bob",
+      "active": false,
+      "id": 2,
+      "role": "reader",
+      "email": "bob@example.org",
+      "team": "Engineering",
+      "location": "Tokyo",
+      "timezone": "Asia/Tokyo"
+    }
+  ],
   "count": 123456789012345678901234567890,
   "a/b": {"~key": "Unicode: 日本語"}
 }

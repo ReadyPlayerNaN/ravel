@@ -35,7 +35,7 @@ glib::wrapper! {
 }
 
 const MIN_HEIGHT: i32 = 48;
-const MAX_HEIGHT: i32 = 360;
+const MAX_HEIGHT: i32 = 640;
 
 struct Slot {
     document: Arc<Document>,
@@ -344,7 +344,8 @@ mod tests {
     fn content_height_is_bounded_in_css_pixels() {
         assert_eq!(fitted_height(20, 1.0), 48);
         assert_eq!(fitted_height(220, 1.0), 220);
-        assert_eq!(fitted_height(1000, 1.0), 360);
+        assert_eq!(fitted_height(500, 1.0), 500);
+        assert_eq!(fitted_height(1000, 1.0), 640);
         assert_eq!(fitted_height(301, 2.0), 151);
     }
 

@@ -29,7 +29,7 @@ fn fitted(view: &webkit6::WebView, native: &gtk::Widget, id: usize) -> bool {
     let (_, natural, _, _) = content.measure(gtk::Orientation::Vertical, content.width());
     let expected = (f64::from(natural) / view.zoom_level())
         .ceil()
-        .clamp(48.0, 360.0);
+        .clamp(48.0, 640.0);
     (slot_height(view, id) - expected).abs() < 1.0 && aligned(view, native, id)
 }
 
@@ -80,7 +80,7 @@ pub(super) fn run(app: &adw::Application) {
     wait_for(|| revealer(users.upcast_ref()).is_child_revealed() && fitted(&view, &native, 0));
     assert_eq!(visible_rows(&native).len(), 7);
     let expanded_height = slot_height(&view, 0);
-    assert!(expanded_height > initial_height && expanded_height < 360.0);
+    assert!(expanded_height > initial_height && expanded_height < 640.0);
     let shifted_top = eval(
         &view,
         "document.querySelector('[data-json-block=\"1\"]').getBoundingClientRect().top + scrollY",
@@ -96,7 +96,7 @@ pub(super) fn run(app: &adw::Application) {
     wait_for(|| {
         records.iter().all(|row| revealer(row).is_child_revealed()) && fitted(&view, &native, 0)
     });
-    assert_eq!(slot_height(&view, 0), 360.0);
+    assert_eq!(slot_height(&view, 0), 640.0);
     let adjustment = native
         .downcast_ref::<gtk::ScrolledWindow>()
         .unwrap()

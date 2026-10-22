@@ -39,7 +39,7 @@ window.ravelJson = (() => {
             const id = Number(block.dataset.jsonBlock);
             if (!Number.isInteger(id) || id < 0 || id >= heights.length || slots.has(id)) continue;
             const height = heights[id];
-            if (!Number.isInteger(height) || height < 48 || height > 360) continue;
+            if (!Number.isInteger(height) || height < 48 || height > 640) continue;
             const raw = block.querySelector("pre");
             const header = block.querySelector(".code-language");
             const slot = document.createElement("div");
@@ -70,7 +70,7 @@ window.ravelJson = (() => {
     }
     function setHeight(id, height) {
         const entry = slots.get(id);
-        if (!entry || !Number.isInteger(height) || height < 48 || height > 360) return;
+        if (!entry || !Number.isInteger(height) || height < 48 || height > 640) return;
         const size = `${height}px`;
         if (entry.slot.style.height !== size) {
             entry.slot.style.height = size;
