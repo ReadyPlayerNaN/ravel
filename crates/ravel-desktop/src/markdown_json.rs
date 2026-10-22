@@ -34,10 +34,14 @@ glib::wrapper! {
         @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
+const MIN_HEIGHT: i32 = 48;
+const MAX_HEIGHT: i32 = 360;
+
 struct Slot {
     document: Arc<Document>,
-    height: i32,
+    height: Rc<Cell<i32>>,
     widget: RefCell<Option<gtk::Widget>>,
+    size_observer: RefCell<Option<gtk::WidgetPaintable>>,
 }
 
 pub struct JsonBlocks {
@@ -63,7 +67,12 @@ impl JsonBlocks {
                 serde_json::Value::Array(values) => values.len(),
                 _ => 0,
             });
-            Slot { document: Arc::clone(document), height: ((children + 1).clamp(2, 9) * 34 + 24) as i32, widget: RefCell::new(None) }
+            Slot {
+                document: Arc::clone(document),
+                height: Rc::new(Cell::new(((children + 1).min(9) as i32 * 34 + 24).clamp(MIN_HEIGHT, MAX_HEIGHT))),
+                widget: RefCell::new(None),
+                size_observer: RefCell::new(None),
+            }
         }).collect();
         let blocks = Rc::new(Self { overlay, layer, view: view.downgrade(), window: window.downgrade(), slots, active: Cell::new(false) });
         let Some(manager) = view.user_content_manager() else { return blocks; };
@@ -81,7 +90,7 @@ impl JsonBlocks {
             move |view, event| {
                 if event == webkit::LoadEvent::Finished {
                     blocks.active.set(true);
-                    let heights: Vec<_> = blocks.slots.iter().map(|slot| slot.height).collect();
+                    let heights: Vec<_> = blocks.slots.iter().map(|slot| slot.height.get()).collect();
                     run_script(view, &format!("window.ravelJson?.enable({heights:?});"));
                 } else if event == webkit::LoadEvent::Started {
                     blocks.deactivate();
@@ -154,10 +163,60 @@ impl JsonBlocks {
         widget.add_css_class("view");
         install_actions(&widget, &slot.document, &self.window);
         install_navigation(&widget, &self.view, id);
+        // WidgetPaintable reports allocation changes during reveal animations
+        // and theme/font changes without keeping an idle frame-clock loop alive.
+        let observer = gtk::WidgetPaintable::new(Some(tree.content()));
+        let view = self.view.clone();
+        let height = Rc::clone(&slot.height);
+        observer.connect_invalidate_size(glib::clone!(
+            #[strong]
+            height,
+            move |observer| {
+                if let Some(view) = view.upgrade() {
+                    update_height(&view, observer, id, &height);
+                }
+            }
+        ));
+        let view = self.view.clone();
+        widget.connect_map(glib::clone!(
+            #[weak]
+            observer,
+            #[strong]
+            height,
+            move |_| {
+                if let Some(view) = view.upgrade() {
+                    update_height(&view, &observer, id, &height);
+                }
+            }
+        ));
+        if let Some(view) = self.view.upgrade() {
+            view.connect_zoom_level_notify(glib::clone!(
+                #[weak]
+                observer,
+                #[strong]
+                height,
+                move |view| update_height(view, &observer, id, &height)
+            ));
+        }
+        *slot.size_observer.borrow_mut() = Some(observer);
         self.layer.put(&widget, 0.0, 0.0);
         *slot.widget.borrow_mut() = Some(widget.clone());
         widget
     }
+}
+
+fn update_height(view: &webkit::WebView, observer: &gtk::WidgetPaintable, id: usize, height: &Cell<i32>) {
+    if !view.is_mapped() { return; }
+    let Some(content) = observer.widget().filter(|content| content.is_mapped()) else { return; };
+    let (_, natural, _, _) = content.measure(gtk::Orientation::Vertical, content.width());
+    let desired = fitted_height(natural, view.zoom_level());
+    if height.replace(desired) != desired {
+        run_script(view, &format!("window.ravelJson?.setHeight({id}, {desired});"));
+    }
+}
+
+fn fitted_height(natural: i32, zoom: f64) -> i32 {
+    (f64::from(natural) / zoom).ceil().clamp(f64::from(MIN_HEIGHT), f64::from(MAX_HEIGHT)) as i32
 }
 
 fn geometry(value: &serde_json::Value, count: usize) -> Option<(usize, [f64; 4])> {
@@ -167,7 +226,7 @@ fn geometry(value: &serde_json::Value, count: usize) -> Option<(usize, [f64; 4])
     if id >= count { return None; }
     let rect = [row[1].as_f64()?, row[2].as_f64()?, row[3].as_f64()?, row[4].as_f64()?];
     if rect.iter().any(|number| !number.is_finite() || number.abs() > 100_000.0)
-        || rect[2] < 1.0 || rect[2] > 16384.0 || rect[3] < 1.0 || rect[3] > 1024.0
+        || rect[2] < 1.0 || rect[2] > 16384.0 || rect[3] < 1.0 || rect[3] > f64::from(MAX_HEIGHT)
     { return None; }
     Some((id, rect))
 }
@@ -280,6 +339,14 @@ fn install_actions(widget: &gtk::Widget, document: &Arc<Document>, window: &glib
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn content_height_is_bounded_in_css_pixels() {
+        assert_eq!(fitted_height(20, 1.0), 48);
+        assert_eq!(fitted_height(220, 1.0), 220);
+        assert_eq!(fitted_height(1000, 1.0), 360);
+        assert_eq!(fitted_height(301, 2.0), 151);
+    }
 
     #[test]
     fn bridge_geometry_rejects_unknown_ids_and_unbounded_or_malformed_rectangles() {

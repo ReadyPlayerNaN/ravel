@@ -20,6 +20,23 @@ fn aligned(view: &webkit6::WebView, native: &gtk::Widget, id: usize) -> bool {
         .all(|(native, html)| (f64::from(*native) - html * view.zoom_level()).abs() <= 2.0)
 }
 
+fn slot_height(view: &webkit6::WebView, id: usize) -> f64 {
+    eval(view, &format!("document.querySelector('[data-json-block=\"{id}\"] .json-structured-slot').getBoundingClientRect().height")).to_double()
+}
+
+fn fitted(view: &webkit6::WebView, native: &gtk::Widget, id: usize) -> bool {
+    let content = find::<gtk::Box>(native, Some("structured-view")).unwrap();
+    let (_, natural, _, _) = content.measure(gtk::Orientation::Vertical, content.width());
+    let expected = (f64::from(natural) / view.zoom_level())
+        .ceil()
+        .clamp(48.0, 360.0);
+    (slot_height(view, id) - expected).abs() < 1.0 && aligned(view, native, id)
+}
+
+fn revealer(row: &gtk::Widget) -> gtk::Revealer {
+    row.next_sibling().unwrap().downcast().unwrap()
+}
+
 pub(super) fn run(app: &adw::Application) {
     let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
     let path = examples.join("json-blocks.md");
@@ -49,12 +66,72 @@ pub(super) fn run(app: &adw::Application) {
             .is_some_and(|widget| widget.is_mapped())
     });
     let native = find::<gtk::Widget>(container.upcast_ref(), Some("markdown-json-0")).unwrap();
-    wait_for(|| aligned(&view, &native, 0));
+    wait_for(|| fitted(&view, &native, 0));
+    let initial_height = slot_height(&view, 0);
+    let following_top = eval(
+        &view,
+        "document.querySelector('[data-json-block=\"1\"]').getBoundingClientRect().top + scrollY",
+    )
+    .to_double();
     let rows = visible_rows(&native);
     assert_eq!(rows.len(), 5); // Same root-expanded native component as a JSON file.
     let users = rows[2].clone().downcast::<gtk::Button>().unwrap();
     users.emit_clicked();
-    wait_for(|| visible_rows(&native).len() == 7);
+    wait_for(|| revealer(users.upcast_ref()).is_child_revealed() && fitted(&view, &native, 0));
+    assert_eq!(visible_rows(&native).len(), 7);
+    let expanded_height = slot_height(&view, 0);
+    assert!(expanded_height > initial_height && expanded_height < 360.0);
+    let shifted_top = eval(
+        &view,
+        "document.querySelector('[data-json-block=\"1\"]').getBoundingClientRect().top + scrollY",
+    )
+    .to_double();
+    assert!((shifted_top - following_top - (expanded_height - initial_height)).abs() < 2.0);
+
+    // Expanding deeper branches hits the cap and enables internal scrolling.
+    let records = visible_rows(&revealer(users.upcast_ref()).child().unwrap());
+    for row in &records {
+        row.downcast_ref::<gtk::Button>().unwrap().emit_clicked();
+    }
+    wait_for(|| {
+        records.iter().all(|row| revealer(row).is_child_revealed()) && fitted(&view, &native, 0)
+    });
+    assert_eq!(slot_height(&view, 0), 360.0);
+    let adjustment = native
+        .downcast_ref::<gtk::ScrolledWindow>()
+        .unwrap()
+        .vadjustment();
+    wait_for(|| adjustment.upper() > adjustment.page_size());
+    adjustment.set_value(adjustment.upper() - adjustment.page_size());
+    assert!(adjustment.value() > 0.0);
+
+    // Shrinking must use natural content size, not the old scroll viewport size.
+    for row in &records {
+        row.downcast_ref::<gtk::Button>().unwrap().emit_clicked();
+    }
+    wait_for(|| {
+        records.iter().all(|row| !revealer(row).is_child_revealed()) && fitted(&view, &native, 0)
+    });
+    assert_eq!(slot_height(&view, 0), expanded_height);
+    wait_for(|| adjustment.value() == 0.0);
+    let root = rows[0].downcast_ref::<gtk::Button>().unwrap();
+    root.emit_clicked();
+    wait_for(|| !revealer(root.upcast_ref()).is_child_revealed() && fitted(&view, &native, 0));
+    assert!(slot_height(&view, 0) < initial_height);
+    root.emit_clicked();
+    wait_for(|| revealer(root.upcast_ref()).is_child_revealed() && fitted(&view, &native, 0));
+    assert_eq!(slot_height(&view, 0), expanded_height);
+
+    // CSS-pixel sizing remains fitted when WebKit zoom changes independently of GTK fonts.
+    view.set_zoom_level(1.25);
+    wait_for(|| native.is_mapped() && fitted(&view, &native, 0));
+    view.set_zoom_level(1.0);
+    eval(
+        &view,
+        "document.querySelector('[data-json-block=\"0\"]').scrollIntoView()",
+    );
+    wait_for(|| native.is_mapped() && fitted(&view, &native, 0));
+    assert_eq!(slot_height(&view, 0), expanded_height);
 
     // Only the slot intercepts pointer events; the surrounding page remains WebKit.
     let bounds = native.compute_bounds(&window).unwrap();
@@ -157,11 +234,17 @@ pub(super) fn run(app: &adw::Application) {
         )
         .to_boolean()
     );
+    // Zoom changes while Raw is visible are applied when the native tree remaps.
+    view.set_zoom_level(1.25);
     eval(
         &view,
         "document.querySelector('[data-json-block=\"0\"] button').click()",
     );
-    wait_for(|| native.is_mapped() && aligned(&view, &native, 0));
+    wait_for(|| native.is_mapped() && fitted(&view, &native, 0));
+    assert_eq!(slot_height(&view, 0), (expanded_height / 1.25).ceil());
+    view.set_zoom_level(1.0);
+    wait_for(|| fitted(&view, &native, 0));
+    assert_eq!(slot_height(&view, 0), expanded_height);
     assert_eq!(visible_rows(&native).len(), 7); // Expansion survives Raw/Structured toggles.
 
     // Switching the whole document to Raw Markdown hides overlays, even across resize.

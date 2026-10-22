@@ -23,7 +23,11 @@ pub fn create() -> (gtk::Widget, Rc<Structured>) {
 
 /// The same tree with Tab traversal delegated to its embedding document.
 pub fn create_embedded() -> (gtk::Widget, Rc<Structured>) {
-    create_with_tab_navigation(false)
+    let (widget, tree) = create_with_tab_navigation(false);
+    // Hosts need natural height, not content stretched to the old viewport
+    // height after collapsing a branch.
+    tree.column.set_valign(gtk::Align::Start);
+    (widget, tree)
 }
 
 fn create_with_tab_navigation(tab_navigation: bool) -> (gtk::Widget, Rc<Structured>) {
@@ -47,6 +51,11 @@ fn create_with_tab_navigation(tab_navigation: bool) -> (gtk::Widget, Rc<Structur
 }
 
 impl Structured {
+    /// The content column, for hosts observing natural size changes.
+    pub fn content(&self) -> &gtk::Box {
+        &self.column
+    }
+
     pub fn clear(&self) {
         while let Some(child) = self.column.first_child() {
             self.column.remove(&child);

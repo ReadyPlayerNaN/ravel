@@ -272,8 +272,10 @@ files, with the first level expanded. The block header's **Raw / Structured**
 button switches between that tree and the original, syntax-highlighted JSON;
 expanded branches are preserved while toggling. Each block has its own node copy,
 JSON Pointer and jq actions, scoped to that block rather than the Markdown file.
-The tree scrolls within the block; at its scroll boundary the page continues
-scrolling. Tab enters/leaves the tree, and Shift+Tab returns to the header button.
+The tree grows and shrinks with expanded branches, up to a height of 360 CSS
+pixels. Larger trees scroll within the block; at its scroll boundary the page
+continues scrolling. Tab enters/leaves the tree, and Shift+Tab returns to the
+header button.
 The header Copy action for the whole document still copies the original Markdown.
 
 Invalid JSON, untagged code and blocks beyond native-view budgets remain raw.
