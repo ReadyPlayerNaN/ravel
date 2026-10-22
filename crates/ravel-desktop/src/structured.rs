@@ -18,6 +18,15 @@ pub struct Structured {
 
 /// Creates the scrollable structured view and its content handle.
 pub fn create() -> (gtk::Widget, Rc<Structured>) {
+    create_with_tab_navigation(true)
+}
+
+/// The same tree with Tab traversal delegated to its embedding document.
+pub fn create_embedded() -> (gtk::Widget, Rc<Structured>) {
+    create_with_tab_navigation(false)
+}
+
+fn create_with_tab_navigation(tab_navigation: bool) -> (gtk::Widget, Rc<Structured>) {
     let column = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(2)
@@ -27,7 +36,7 @@ pub fn create() -> (gtk::Widget, Rc<Structured>) {
         .margin_end(6)
         .build();
     column.set_widget_name("structured-view");
-    crate::tree_navigation::install(&column);
+    crate::tree_navigation::install(&column, tab_navigation);
     let scrolled = gtk::ScrolledWindow::builder()
         .child(&column)
         .hscrollbar_policy(gtk::PolicyType::Never)

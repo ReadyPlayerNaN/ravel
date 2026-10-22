@@ -19,6 +19,7 @@ const CSP: &str = "default-src 'none'; script-src ravel-assets:; style-src ravel
 pub struct MarkdownView {
     widget: gtk::Box,
     view: RefCell<Option<webkit::WebView>>,
+    json: RefCell<Option<Rc<crate::markdown_json::JsonBlocks>>>,
     window: glib::WeakRef<adw::ApplicationWindow>,
     error: gtk::Label,
 }
@@ -40,6 +41,7 @@ impl MarkdownView {
         Self {
             widget,
             view: RefCell::new(None),
+            json: RefCell::new(None),
             window: window.downgrade(),
             error,
         }
@@ -159,14 +161,18 @@ impl MarkdownView {
         let Some(view) = self.create_view(document, &uri) else {
             return;
         };
-        self.widget.append(&view);
+        if let Some(window) = self.window.upgrade() {
+            let json = crate::markdown_json::JsonBlocks::new(&view, &window, document.json_blocks());
+            self.widget.append(&json.overlay);
+            *self.json.borrow_mut() = Some(json);
+        }
         let theme = if adw::StyleManager::default().is_dark() {
             "dark"
         } else {
             "light"
         };
         let html = format!(
-            "<!doctype html><html data-theme=\"{theme}\"><head><meta charset=\"utf-8\"><meta http-equiv=\"Content-Security-Policy\" content=\"{CSP}\"><meta name=\"referrer\" content=\"no-referrer\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><link rel=\"stylesheet\" href=\"ravel-assets:///katex/katex.min.css\"><link rel=\"stylesheet\" href=\"ravel-assets:///reader.css\"></head><body>{}<script src=\"ravel-assets:///katex/katex.min.js\"></script><script src=\"ravel-assets:///highlight/highlight.min.js\"></script><script src=\"ravel-assets:///reader.js\"></script></body></html>",
+            "<!doctype html><html data-theme=\"{theme}\"><head><meta charset=\"utf-8\"><meta http-equiv=\"Content-Security-Policy\" content=\"{CSP}\"><meta name=\"referrer\" content=\"no-referrer\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><link rel=\"stylesheet\" href=\"ravel-assets:///katex/katex.min.css\"><link rel=\"stylesheet\" href=\"ravel-assets:///reader.css\"></head><body>{}<script src=\"ravel-assets:///katex/katex.min.js\"></script><script src=\"ravel-assets:///highlight/highlight.min.js\"></script><script src=\"ravel-assets:///reader.js\"></script><script src=\"ravel-assets:///json-blocks.js\"></script></body></html>",
             document.html()
         );
         view.load_html(&html, Some(&uri));
@@ -174,9 +180,12 @@ impl MarkdownView {
     }
 
     pub fn clear(&self) {
+        if let Some(json) = self.json.borrow_mut().take() {
+            json.clear();
+            self.widget.remove(&json.overlay);
+        }
         if let Some(view) = self.view() {
             self.view.borrow_mut().take();
-            self.widget.remove(&view);
             view.set_is_muted(true);
             view.stop_loading();
             // Each document owns its context/process. Terminating it releases

@@ -267,6 +267,22 @@ console.log(greeting);
 ```
 ````
 
+Valid `json` fences open in the **same native structured tree** used for JSON
+files, with the first level expanded. The block header's **Raw / Structured**
+button switches between that tree and the original, syntax-highlighted JSON;
+expanded branches are preserved while toggling. Each block has its own node copy,
+JSON Pointer and jq actions, scoped to that block rather than the Markdown file.
+The tree scrolls within the block; at its scroll boundary the page continues
+scrolling. Tab enters/leaves the tree, and Shift+Tab returns to the header button.
+The header Copy action for the whole document still copies the original Markdown.
+
+Invalid JSON, untagged code and blocks beyond native-view budgets remain raw.
+Embedded JSON is parsed off the UI thread with a limit of 16 JSON fences attempted,
+64 KiB per block, 256 KiB total, 2,048 values per tree and 128 immediate root
+children. No content is discarded when a limit is exceeded. Native overlays are
+clipped to the Markdown viewport and removed on document replacement; their
+trusted bridge accepts only document-local slot geometry and focus IDs.
+
 Each code block has a compact language header, defaulting to `text` for untagged
 fences and indented code. The header stays above the code when scrolling long
 lines and is separate from code selection/copying.
@@ -327,7 +343,8 @@ original Markdown.
 
 **Raw Markdown** preserves source with syntax highlighting, apart from stripping a
 leading UTF-8 BOM. Selection copying in Formatted copies rendered text. JSON trees,
-pointers, jq actions, key hover and JSON folding do not apply to Markdown.
+pointers, jq actions, key hover and JSON folding do not apply to the Markdown
+document itself. Embedded JSON trees have their own block-local node actions.
 
 Embedded HTML remains literal text, including `<script>`, `<img>`, `<audio>` and
 `<video>` tags. Only Ravel-generated markup and bundled application scripts run;

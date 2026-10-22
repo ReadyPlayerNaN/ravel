@@ -2,10 +2,10 @@
 use gtk::{gdk, glib};
 use libadwaita::prelude::*;
 
-pub fn install(column: &gtk::Box) {
+pub fn install(column: &gtk::Box, tab_navigation: bool) {
     let installed = std::cell::Cell::new(false);
     column.connect_map(move |column| {
-        if !installed.replace(true) {
+        if tab_navigation && !installed.replace(true) {
             crate::tree_tab::install(column);
         }
     });

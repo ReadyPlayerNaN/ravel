@@ -16,7 +16,7 @@ pub(super) fn run(app: &adw::Application) {
     wait_for(|| !viewer.spinner.is_spinning());
     let view = viewer.markdown.view().unwrap();
     ready(&view);
-    assert_eq!(eval(&view, "JSON.stringify(Array.from(document.querySelectorAll('.code-language'), n => n.textContent))").to_string(), r#"["javascript","JS","json","rust","html","not-a-language","text","text"]"#);
+    assert_eq!(eval(&view, "JSON.stringify(Array.from(document.querySelectorAll('.code-language'), n => n.firstChild.textContent))").to_string(), r#"["javascript","JS","json","rust","html","not-a-language","text","text"]"#);
     assert!(eval(&view, "Array.from(document.querySelectorAll('pre > code')).every(c => c.parentElement.previousElementSibling.classList.contains('code-language')) && !document.querySelector('p .code-language, pre .code-language')").to_boolean());
     assert!(eval(&view, "document.querySelector('.code-language').getBoundingClientRect().bottom <= document.querySelector('pre').getBoundingClientRect().top && parseFloat(getComputedStyle(document.querySelector('.code-language')).fontSize) < parseFloat(getComputedStyle(document.querySelector('pre')).fontSize)").to_boolean());
     assert!(eval(&view, "document.querySelector('code[data-language=javascript] .hljs-keyword').textContent === 'const'").to_boolean());

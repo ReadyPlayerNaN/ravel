@@ -16,7 +16,9 @@ without an explicit requirement.
   JSON-only hover indexing and delimiter folding must not run on YAML source.
   `markdown.rs` / `markdown_html.rs` parse Markdown separately from JSON trees
   into a text fallback and safe generated HTML (links, headings/index, footnotes,
-  media, math placeholders and task controls). Preserve source, UTF-8 validation
+  media, math placeholders and task controls). Bounded `json` fences also expose
+  parsed documents and document-local slot IDs for native structured presentation;
+  invalid or over-budget blocks retain their raw code. Preserve source, UTF-8 validation
   and rendering budgets. Core never loads resources; source HTML must be escaped.
 - `crates/ravel-desktop`: native UI, file opening, application actions, and errors.
   `preview.rs` configures the read-only GtkSourceView preview and binds its
@@ -29,8 +31,11 @@ without an explicit requirement.
   denied permissions and navigation policy intact. Media may load from local or
   HTTP(S) resources; local media gets per-document, read-only sandbox grants. Never
   disable WebKit's sandbox in application code. Task toggles are temporary DOM
-  state, never saved edits. Markdown has no structural/jq actions or JSON
-  hover/folding. Keep highlighting and folding in this layer; copied text includes
+  state, never saved edits. Markdown itself has no structural/jq actions or JSON
+  hover/folding; its embedded JSON blocks reuse `structured.rs` with block-local
+  actions and a Raw toggle. `markdown_json.rs` clips native trees over WebKit slots;
+  its bridge accepts only bounded geometry/focus IDs, never source, paths or queries.
+  Keep highlighting and folding in this layer; copied text includes
   hidden content.
   Use the GLib main context for UI tasks and GIO's worker pool for parsing.
 - `examples`: small documents for manual and automated smoke tests.
