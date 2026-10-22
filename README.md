@@ -109,8 +109,10 @@ do not prevent viewing. Delete this file while Ravel is closed to clear history.
 
 ## Structured nodes and jq
 
-Expand a container by clicking its row; children appear with a 250 ms slide
-animation and are built only on first expansion. Right-click its row (or a scalar
+Documents open with the root expanded, showing its immediate fields or array
+items. This also applies to JSON Lines records and YAML stream documents. Deeper
+containers start collapsed; click a row to expand it with a 250 ms slide
+animation. Children of those nested containers are built only on first expansion. Right-click its row (or a scalar
 row) for a custom node menu. Object operations include keys, values, length and
 entries; arrays offer sorting, uniqueness, reversal, flattening and aggregation;
 strings offer case conversion and numeric conversion. Every type offers `type`.

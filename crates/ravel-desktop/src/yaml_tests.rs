@@ -15,6 +15,15 @@ pub fn run(app: &adw::Application) {
     let widget = window.clone().upcast::<gtk::Widget>();
     let stack = find::<adw::ViewStack>(&widget, Some("view-stack")).unwrap();
     assert_eq!(stack.visible_child_name().as_deref(), Some("structured"));
+    let tree = find::<gtk::Widget>(&widget, Some("structured-view")).unwrap();
+    let rows = crate::tree_navigation::visible_rows(&tree);
+    assert_eq!(rows.len(), 9); // Root plus eight YAML keys, without expanding nested mappings.
+    let root_revealer = rows[0]
+        .next_sibling()
+        .unwrap()
+        .downcast::<gtk::Revealer>()
+        .unwrap();
+    assert!(root_revealer.reveals_child());
     let status = find::<gtk::Label>(&widget, Some("document-statistics")).unwrap();
     assert!(status.text().starts_with("YAML · 1 document"));
     let source = find::<sourceview5::View>(&widget, None).unwrap();
@@ -110,6 +119,8 @@ pub fn run(app: &adw::Application) {
             .is_some_and(|title| title.contains("resources.yml"))
     });
     let widget = stream.clone().upcast::<gtk::Widget>();
+    let tree = find::<gtk::Widget>(&widget, Some("structured-view")).unwrap();
+    assert_eq!(crate::tree_navigation::visible_rows(&tree).len(), 4); // Root plus three stream slots.
     let status = find::<gtk::Label>(&widget, Some("document-statistics")).unwrap();
     assert!(status.text().starts_with("YAML · 3 documents"));
     let source = find::<sourceview5::View>(&widget, None).unwrap();

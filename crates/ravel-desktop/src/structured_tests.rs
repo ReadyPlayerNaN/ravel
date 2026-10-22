@@ -54,16 +54,27 @@ pub fn run(app: &adw::Application) {
     let structured = find::<gtk::Widget>(&widget, Some("structured-view")).unwrap();
     wait_for(|| structured.is_mapped() && !toggles(&structured).is_empty());
 
-    // Only the root is built initially; children appear after the animated expand.
-    assert_eq!(toggles(&structured).len(), 1);
-    let root = toggles(&structured)[0].clone();
+    // The root's immediate children are visible without an initial click.
+    assert_eq!(toggles(&structured).len(), 3);
+    assert_eq!(crate::tree_navigation::visible_rows(&structured).len(), 4);
+    let root = toggles(&structured)
+        .into_iter()
+        .find(|toggle| key_text(toggle) == "$")
+        .unwrap();
     let revealer = revealer_of(&root);
     assert_eq!(revealer.transition_duration(), 250);
     assert_eq!(
         revealer.transition_type(),
         gtk::RevealerTransitionType::SlideDown
     );
-    assert!(!revealer.reveals_child());
+    assert!(revealer.reveals_child());
+    assert_eq!(
+        find::<gtk::Image>(root.upcast_ref(), Some("node-arrow"))
+            .unwrap()
+            .icon_name()
+            .as_deref(),
+        Some("pan-down-symbolic")
+    );
     let member_count = root
         .child()
         .unwrap()
@@ -79,10 +90,13 @@ pub fn run(app: &adw::Application) {
         normal_weight.to_string()
     );
     assert!(member_count.is_visible());
+    wait_for(|| revealer.is_child_revealed());
     root.emit_clicked();
-    wait_for(|| {
-        revealer.reveals_child() && revealer.is_child_revealed() && toggles(&structured).len() == 3
-    });
+    wait_for(|| !revealer.is_child_revealed());
+    assert_eq!(crate::tree_navigation::visible_rows(&structured).len(), 1);
+    root.emit_clicked();
+    wait_for(|| revealer.is_child_revealed());
+    assert_eq!(toggles(&structured).len(), 3);
     assert!(
         member_count.is_visible(),
         "Expanded objects must retain their member count"
@@ -92,6 +106,8 @@ pub fn run(app: &adw::Application) {
         .find(|toggle| key_text(toggle) == "users")
         .unwrap();
     let users_revealer = revealer_of(&users);
+    assert!(!users_revealer.reveals_child());
+    assert!(users_revealer.child().unwrap().first_child().is_none());
     let count = users
         .child()
         .unwrap()
@@ -129,9 +145,15 @@ pub fn run(app: &adw::Application) {
     let events_widget = events.clone().upcast::<gtk::Widget>();
     let events_structured = find::<gtk::Widget>(&events_widget, Some("structured-view")).unwrap();
     wait_for(|| !toggles(&events_structured).is_empty());
-    let events_root = toggles(&events_structured)[0].clone();
-    events_root.emit_clicked();
-    wait_for(|| toggles(&events_structured).len() == 4); // Root plus three records.
+    assert_eq!(toggles(&events_structured).len(), 4); // Root plus three unexpanded records.
+    assert_eq!(
+        crate::tree_navigation::visible_rows(&events_structured).len(),
+        4
+    );
+    for toggle in toggles(&events_structured) {
+        let revealer = revealer_of(&toggle);
+        assert_eq!(revealer.reveals_child(), key_text(&toggle) == "$");
+    }
     events.close();
     // Exercise the real menu activation path, not just the window action.
     let controllers = root.observe_controllers();

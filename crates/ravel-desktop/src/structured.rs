@@ -44,7 +44,8 @@ impl Structured {
         }
     }
 
-    /// Renders `document.pointer(pointer)` as a widget tree, replacing prior content.
+    /// Renders `document.pointer(pointer)` with its immediate children visible,
+    /// replacing prior content. Deeper containers remain collapsed and lazy.
     pub fn set_content(&self, document: &Arc<Document>, pointer: &str) {
         self.clear();
         if document.value_at(pointer).is_some() {
@@ -100,7 +101,12 @@ fn container_widget(
     toggle.set_widget_name("node-toggle");
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     row.set_margin_start(depth * INDENT);
-    let arrow = gtk::Image::from_icon_name("pan-end-symbolic");
+    let initially_expanded = depth == 0;
+    let arrow = gtk::Image::from_icon_name(if initially_expanded {
+        "pan-down-symbolic"
+    } else {
+        "pan-end-symbolic"
+    });
     arrow.set_widget_name("node-arrow");
     let key = key_label(label);
     let count = gtk::Label::builder()
@@ -117,15 +123,18 @@ fn container_widget(
     row.append(&count);
     toggle.set_child(Some(&row));
 
-    // Children are built on first expansion so closed branches stay cheap.
+    // Show the first level immediately; deeper closed branches stay cheap.
     let children = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    if initially_expanded {
+        populate_children(&children, document, pointer, depth);
+    }
     let revealer = gtk::Revealer::builder()
         .child(&children)
         .transition_type(gtk::RevealerTransitionType::SlideDown)
         .transition_duration(EXPAND_MS)
-        .reveal_child(false)
+        .reveal_child(initially_expanded)
         .build();
-    let built = Rc::new(Cell::new(false));
+    let built = Rc::new(Cell::new(initially_expanded));
     let pointer = pointer.to_owned();
     toggle.connect_clicked(glib::clone!(
         #[weak]
@@ -142,14 +151,7 @@ fn container_widget(
             crate::tree_navigation::recover_before_collapse(button.upcast_ref(), &revealer);
             if !built.get() {
                 built.set(true);
-                for (child_pointer, child_label) in member_pointers(&document, &pointer) {
-                    children.append(&node_widget(
-                        &document,
-                        &child_pointer,
-                        &child_label,
-                        depth + 1,
-                    ));
-                }
+                populate_children(&children, &document, &pointer, depth);
             }
             revealer_toggle(&revealer);
         }
@@ -169,6 +171,12 @@ fn container_widget(
     column.append(&toggle);
     column.append(&revealer);
     column.upcast()
+}
+
+fn populate_children(children: &gtk::Box, document: &Arc<Document>, pointer: &str, depth: i32) {
+    for (child_pointer, child_label) in member_pointers(document, pointer) {
+        children.append(&node_widget(document, &child_pointer, &child_label, depth + 1));
+    }
 }
 
 fn scalar_widget(document: &Arc<Document>, pointer: &str, label: &str, depth: i32) -> gtk::Widget {

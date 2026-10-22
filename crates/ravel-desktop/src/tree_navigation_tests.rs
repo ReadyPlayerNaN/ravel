@@ -46,7 +46,18 @@ pub fn run(app: &adw::Application) {
         .filter_map(|i| column.observe_controllers().item(i))
         .find_map(|object| object.downcast::<gtk::EventControllerKey>().ok())
         .unwrap();
+    assert_eq!(visible_rows(column.upcast_ref()).len(), 4);
     let root = visible_rows(column.upcast_ref())[0].clone();
+    assert!(reveal(&root).reveals_child());
+    let initial_list = visible_rows(column.upcast_ref())[1].clone();
+    assert!(!reveal(&initial_list).reveals_child());
+    assert!(
+        reveal(&initial_list)
+            .child()
+            .unwrap()
+            .first_child()
+            .is_none()
+    );
     wait_for(|| root.height() > 0 && root.is_mapped() && window.is_active());
     assert!(before.grab_focus());
     assert!(window.child_focus(gtk::DirectionType::TabForward));
@@ -55,7 +66,7 @@ pub fn run(app: &adw::Application) {
     let rows = visible_rows(column.upcast_ref());
     assert_eq!(rows.len(), 4);
     let list = rows[1].clone();
-    assert_eq!(focused(&window), list); // One Right opens AND enters.
+    assert_eq!(focused(&window), list); // Right enters the already expanded root.
     assert!(reveal(&root).reveals_child());
     press(&keys, gdk::Key::Right);
     let rows = visible_rows(column.upcast_ref());
@@ -178,6 +189,7 @@ pub fn run(app: &adw::Application) {
     let long_document =
         Arc::new(ravel_core::Document::parse(&long_json, ravel_core::Format::Json).unwrap());
     structured.set_content(&long_document, "");
+    assert_eq!(visible_rows(column.upcast_ref()).len(), 41);
     visible_rows(column.upcast_ref())[0].grab_focus();
     press(&keys, gdk::Key::Right);
     press(&keys, gdk::Key::End);
@@ -187,5 +199,22 @@ pub fn run(app: &adw::Application) {
         focused(&window),
         visible_rows(column.upcast_ref()).last().unwrap().clone()
     );
+    // Replacement resets nested expansion while exposing the first level again.
+    structured.set_content(&document, "");
+    let rows = visible_rows(column.upcast_ref());
+    assert_eq!(rows.len(), 4);
+    assert!(reveal(&rows[0]).reveals_child());
+    assert!(!reveal(&rows[1]).reveals_child());
+    assert_eq!(rows.iter().filter(|row| row.is_focusable()).count(), 1);
+    for source in ["null", "42", "\"text\"", "[]", "{}"] {
+        let document = Arc::new(
+            ravel_core::Document::parse(source.as_bytes(), ravel_core::Format::Json).unwrap(),
+        );
+        structured.set_content(&document, "");
+        let rows = visible_rows(column.upcast_ref());
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].widget_name(), "node-row");
+        assert!(rows[0].is_focusable());
+    }
     window.close();
 }
