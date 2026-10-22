@@ -13,7 +13,20 @@ use super::{MAX_EVENTS, MAX_NESTING, MAX_RENDERED_BYTES, MarkdownError};
 
 type Result<T> = std::result::Result<T, MarkdownError>;
 
-pub(super) fn render(source: &str) -> Result<(String, Vec<String>)> {
+// Bound the number of native widgets and the cost of parsing/indexing embedded JSON.
+const MAX_JSON_BLOCKS: usize = 16;
+const MAX_JSON_BLOCK_BYTES: usize = 64 * 1024;
+const MAX_JSON_TOTAL_BYTES: usize = 256 * 1024;
+const MAX_JSON_VALUES: usize = 2048;
+const MAX_JSON_ROOT_CHILDREN: usize = 128;
+
+pub(super) struct Rendered {
+    pub html: String,
+    pub media_sources: Vec<String>,
+    pub json_blocks: Vec<std::sync::Arc<crate::Document>>,
+}
+
+pub(super) fn render(source: &str) -> Result<Rendered> {
     let options = Options::ENABLE_TABLES
         | Options::ENABLE_STRIKETHROUGH
         | Options::ENABLE_TASKLISTS
@@ -59,7 +72,11 @@ pub(super) fn render(source: &str) -> Result<(String, Vec<String>)> {
     result.push_str(&renderer.output);
     result.push_str("</article></div>");
     check_size(&result)?;
-    Ok((result, renderer.media_sources.into_iter().collect()))
+    Ok(Rendered {
+        html: result,
+        media_sources: renderer.media_sources.into_iter().collect(),
+        json_blocks: renderer.json_blocks,
+    })
 }
 
 fn check_size(text: &str) -> Result<()> {
@@ -198,6 +215,9 @@ struct Renderer {
     link_finder: LinkFinder,
     domain_finder: LinkFinder,
     in_code_block: bool,
+    json_blocks: Vec<std::sync::Arc<crate::Document>>,
+    json_bytes: usize,
+    json_attempts: usize,
     table_alignments: Vec<Alignment>,
     table_head: bool,
     table_column: usize,
@@ -306,6 +326,13 @@ impl Renderer {
                     self.output.push_str(&format!("<h{} id=\"{}\" tabindex=\"-1\">", *level as u8, escape(&id)));
                     self.headings.push((*level as u8, id, title));
                 }
+                Event::Start(Tag::CodeBlock(kind)) => {
+                    let end = events[index + 1..].iter()
+                        .position(|event| matches!(event, Event::End(TagEnd::CodeBlock)))
+                        .map_or(events.len(), |offset| index + 1 + offset);
+                    let json = self.json_block(kind, &events[index + 1..end]);
+                    self.start_code(kind, json);
+                }
                 Event::Start(tag) => self.start(tag),
                 Event::End(tag) => self.end(*tag),
                 Event::Text(text) => self.text(text)?,
@@ -384,30 +411,76 @@ impl Renderer {
         check_size(&self.output)
     }
 
+    fn json_block(&mut self, kind: &CodeBlockKind<'_>, events: &[Event<'_>]) -> Option<usize> {
+        let CodeBlockKind::Fenced(info) = kind else {
+            return None;
+        };
+        if !info
+            .split_whitespace()
+            .next()
+            .is_some_and(|language| language.eq_ignore_ascii_case("json"))
+            || self.json_attempts >= MAX_JSON_BLOCKS
+        {
+            return None;
+        }
+        self.json_attempts += 1;
+        let mut source = String::new();
+        for event in events {
+            if let Event::Text(text) = event {
+                if source.len() + text.len() > MAX_JSON_BLOCK_BYTES {
+                    return None;
+                }
+                source.push_str(text);
+            }
+        }
+        self.json_bytes += source.len();
+        if self.json_bytes > MAX_JSON_TOTAL_BYTES {
+            return None;
+        }
+        let document = crate::Document::parse(source.as_bytes(), crate::Format::Json).ok()?;
+        let root_children = document.value_at("").map_or(0, |value| match value {
+            serde_json::Value::Object(values) => values.len(),
+            serde_json::Value::Array(values) => values.len(),
+            _ => 0,
+        });
+        if document.statistics().values > MAX_JSON_VALUES || root_children > MAX_JSON_ROOT_CHILDREN
+        {
+            return None;
+        }
+        let id = self.json_blocks.len();
+        self.json_blocks.push(std::sync::Arc::new(document));
+        Some(id)
+    }
+
+    fn start_code(&mut self, kind: &CodeBlockKind<'_>, json: Option<usize>) {
+        self.in_code_block = true;
+        let info = match kind {
+            CodeBlockKind::Fenced(info) => Some(info.as_ref()),
+            CodeBlockKind::Indented => None,
+        };
+        let language = info.and_then(|info| info.split_whitespace().next());
+        self.output.push_str("<div class=\"code-block\"");
+        if let Some(id) = json {
+            self.output.push_str(&format!(" data-json-block=\"{id}\""));
+        }
+        self.output.push_str(&format!(
+            "><div class=\"code-language\">{}</div><pre><code",
+            escape(language.unwrap_or("text"))
+        ));
+        if let (Some(info), Some(language)) = (info, language) {
+            self.output.push_str(&format!(
+                " data-language=\"{}\" title=\"{}\"",
+                escape(language),
+                escape(info)
+            ));
+        }
+        self.output.push('>');
+    }
+
     fn start(&mut self, tag: &Tag<'_>) {
         match tag {
             Tag::Paragraph => self.output.push_str("<p>"),
             Tag::BlockQuote(_) => self.output.push_str("<blockquote>"),
-            Tag::CodeBlock(kind) => {
-                self.in_code_block = true;
-                let info = match kind {
-                    CodeBlockKind::Fenced(info) => Some(info.as_ref()),
-                    CodeBlockKind::Indented => None,
-                };
-                let language = info.and_then(|info| info.split_whitespace().next());
-                self.output.push_str(&format!(
-                    "<div class=\"code-block\"><div class=\"code-language\">{}</div><pre><code",
-                    escape(language.unwrap_or("text"))
-                ));
-                if let (Some(info), Some(language)) = (info, language) {
-                    self.output.push_str(&format!(
-                        " data-language=\"{}\" title=\"{}\"",
-                        escape(language),
-                        escape(info)
-                    ));
-                }
-                self.output.push('>');
-            }
             Tag::HtmlBlock => self.output.push_str("<pre class=\"literal-html\">"),
             Tag::List(Some(start)) => self.output.push_str(&format!("<ol start=\"{start}\">")),
             Tag::List(None) => self.output.push_str("<ul>"),

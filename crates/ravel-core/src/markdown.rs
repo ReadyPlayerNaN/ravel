@@ -73,6 +73,7 @@ pub struct Markdown {
     spans: Vec<Span>,
     html: String,
     media_sources: Vec<String>,
+    json_blocks: Vec<std::sync::Arc<crate::Document>>,
 }
 
 impl Markdown {
@@ -107,13 +108,14 @@ impl Markdown {
                 return Err(MarkdownError::ComplexityLimit);
             }
         }
-        let (html, media_sources) = rich::render(source)?;
+        let rich = rich::render(source)?;
         Ok(Self {
             source: source.to_owned(),
             text: renderer.text,
             spans: renderer.spans,
-            html,
-            media_sources,
+            html: rich.html,
+            media_sources: rich.media_sources,
+            json_blocks: rich.json_blocks,
         })
     }
 
@@ -140,6 +142,14 @@ impl Markdown {
     /// desktop uses these to grant read-only sandbox access to local media only.
     pub fn media_sources(&self) -> &[String] {
         &self.media_sources
+    }
+
+    /// Parsed, bounded `json` fenced blocks for native structured presentation.
+    /// Each entry's index matches the generated HTML's `data-json-block` attribute.
+    /// Invalid or over-budget blocks remain raw HTML code blocks. Parsing never
+    /// loads resources; raw code and the original Markdown remain unchanged.
+    pub fn json_blocks(&self) -> &[std::sync::Arc<crate::Document>] {
+        &self.json_blocks
     }
 
     /// Semantic formatting ranges for the rendered text.
